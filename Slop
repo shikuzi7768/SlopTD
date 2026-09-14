@@ -404,17 +404,30 @@ AutoSummonBtn.TextSize = 13
 AutoSummonBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoSummonBtn).CornerRadius = UDim.new(0, 4)
 
--- Trade Button
-local TradeBtn = Instance.new("TextButton")
-TradeBtn.Size = UDim2.new(0.9, 0, 0, 30)
-TradeBtn.Position = UDim2.new(0.05, 0, 0, 375)
-TradeBtn.BackgroundColor3 = Color3.fromRGB(140, 80, 200)
-TradeBtn.Text = "Open Trade Menu"
-TradeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-TradeBtn.Font = Enum.Font.SourceSansBold
-TradeBtn.TextSize = 13
-TradeBtn.Parent = ContentFrame
-Instance.new("UICorner", TradeBtn).CornerRadius = UDim.new(0, 4)
+-- Trade Target Username Box
+local TradeUserBox = Instance.new("TextBox")
+TradeUserBox.Size = UDim2.new(0.6, 0, 0, 30)
+TradeUserBox.Position = UDim2.new(0.05, 0, 0, 375)
+TradeUserBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TradeUserBox.Text = "SanzzPro1"
+TradeUserBox.PlaceholderText = "Username Roblox"
+TradeUserBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+TradeUserBox.Font = Enum.Font.SourceSans
+TradeUserBox.TextSize = 12
+TradeUserBox.Parent = ContentFrame
+Instance.new("UICorner", TradeUserBox).CornerRadius = UDim.new(0, 4)
+
+-- Send Trade Button
+local SendTradeBtn = Instance.new("TextButton")
+SendTradeBtn.Size = UDim2.new(0.28, 0, 0, 30)
+SendTradeBtn.Position = UDim2.new(0.67, 0, 0, 375)
+SendTradeBtn.BackgroundColor3 = Color3.fromRGB(140, 80, 200)
+SendTradeBtn.Text = "Send Trade"
+SendTradeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SendTradeBtn.Font = Enum.Font.SourceSansBold
+SendTradeBtn.TextSize = 11
+SendTradeBtn.Parent = ContentFrame
+Instance.new("UICorner", SendTradeBtn).CornerRadius = UDim.new(0, 4)
 
 -- Detailed Status Info Label
 local StatusLabel = Instance.new("TextLabel")
@@ -485,7 +498,8 @@ saveConfigToFile = function()
         diffName = DiffNameBox.Text,
         selectedMacro = selectedMacroFile,
         saveInputText = SaveNameBox.Text,
-        multiMacroText = MultiNameBox.Text
+        multiMacroText = MultiNameBox.Text,
+        tradeUser = TradeUserBox.Text
     }
     writefile(CONFIG_FILE, HttpService:JSONEncode(configData))
 end
@@ -537,6 +551,7 @@ loadConfigFromFile = function()
         if result.diffName then DiffNameBox.Text = result.diffName end
         if result.saveInputText then SaveNameBox.Text = result.saveInputText end
         if result.multiMacroText then MultiNameBox.Text = result.multiMacroText end
+        if result.tradeUser then TradeUserBox.Text = result.tradeUser end
         if result.selectedMacro and result.selectedMacro ~= "" then loadMacroFromFile(result.selectedMacro) end
     end
 end
@@ -1026,6 +1041,10 @@ MultiNameBox.FocusLost:Connect(function()
     saveConfigToFile()
 end)
 
+TradeUserBox.FocusLost:Connect(function()
+    saveConfigToFile()
+end)
+
 RefreshBtn.MouseButton1Click:Connect(function()
     if not supportsFileSystem then return end
     local files = listfiles(FOLDER_NAME)
@@ -1139,41 +1158,30 @@ AutoSummonBtn.MouseButton1Click:Connect(function()
     saveConfigToFile()
 end)
 
--- LOGIKA TRADE BUTTON
-TradeBtn.MouseButton1Click:Connect(function()
-    local opened = false
+-- LOGIKA SEND TRADE BUTTON
+SendTradeBtn.MouseButton1Click:Connect(function()
+    local targetUsername = TradeUserBox.Text
+    if targetUsername == "" or targetUsername == "Username Roblox" then
+        StatusLabel.Text = "Status: Masukkan username target terlebih dahulu!"
+        return
+    end
 
-    -- 1. Buka Frame/Menu Trade di PlayerGui secara paksa
-    pcall(function()
-        for _, gui in ipairs(playerGui:GetChildren()) do
-            if gui:IsA("ScreenGui") then
-                for _, desc in ipairs(gui:GetDescendants()) do
-                    if (desc:IsA("Frame") or desc:IsA("ImageLabel")) and string.find(string.lower(desc.Name), "trade") then
-                        desc.Visible = not desc.Visible
-                        opened = true
-                    end
-                end
-            end
+    local success, err = pcall(function()
+        local sendRequestRemote = ReplicatedStorage:FindFirstChild("Remotes")
+            and ReplicatedStorage.Remotes:FindFirstChild("Trading")
+            and ReplicatedStorage.Remotes.Trading:FindFirstChild("SendRequest")
+
+        if sendRequestRemote then
+            sendRequestRemote:InvokeServer(targetUsername)
+        else
+            error("Remote SendRequest tidak ditemukan di ReplicatedStorage.Remotes.Trading!")
         end
     end)
 
-    -- 2. Tembak Remote Trade bawaan game jika ada
-    local tradeRemote = getEventRemote({"Trade", "OpenTrade", "Trading", "RequestTrade", "SendTrade"})
-    if tradeRemote then
-        pcall(function()
-            if tradeRemote:IsA("RemoteEvent") then
-                tradeRemote:FireServer()
-            elseif tradeRemote:IsA("RemoteFunction") then
-                tradeRemote:InvokeServer()
-            end
-            opened = true
-        end)
-    end
-
-    if opened then
-        StatusLabel.Text = "Status: Membuka/Memicu Menu Trade!"
+    if success then
+        StatusLabel.Text = string.format("Status: Permintaan trade berhasil dikirim ke %s!", targetUsername)
     else
-        StatusLabel.Text = "Status: UI/Remote Trade tidak ditemukan secara otomatis."
+        StatusLabel.Text = "Status Error: " .. tostring(err)
     end
 end)
 
