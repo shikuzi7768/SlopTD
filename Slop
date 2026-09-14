@@ -1072,6 +1072,10 @@ SpeedBtn.MouseButton1Click:Connect(function()
     if currentSpeedMultiplier == 1 then
         currentSpeedMultiplier = 2
     elseif currentSpeedMultiplier == 2 then
+        currentSpeedMultiplier = 3
+    elseif currentSpeedMultiplier == 3 then
+        currentSpeedMultiplier = 4
+    elseif currentSpeedMultiplier == 4 then
         currentSpeedMultiplier = 5
     else
         currentSpeedMultiplier = 1
