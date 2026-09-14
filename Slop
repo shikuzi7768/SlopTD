@@ -26,7 +26,7 @@ local selectedMacroFile = ""
 local isAutoPlaySingleEnabled = false
 local isAutoPlayMultiEnabled = false
 local currentSpeedMultiplier = 1
-local isAutoSummonEnabled = false
+local autoSummonAmount = 0 -- 0 = OFF, 10 = 10x, 50 = 50x
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
@@ -397,7 +397,7 @@ local AutoSummonBtn = Instance.new("TextButton")
 AutoSummonBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoSummonBtn.Position = UDim2.new(0.05, 0, 0, 340)
 AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
-AutoSummonBtn.Text = "Auto Summon (10x): OFF"
+AutoSummonBtn.Text = "Auto Summon: OFF"
 AutoSummonBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 AutoSummonBtn.Font = Enum.Font.SourceSansBold
 AutoSummonBtn.TextSize = 13
@@ -468,7 +468,7 @@ saveConfigToFile = function()
         autoVote = isAutoVoteEnabled,
         autoVoteDiff = isAutoVoteDiffEnabled,
         speedMultiplier = currentSpeedMultiplier,
-        autoSummon = isAutoSummonEnabled,
+        autoSummonAmount = autoSummonAmount,
         mapName = MapNameBox.Text,
         diffName = DiffNameBox.Text,
         selectedMacro = selectedMacroFile,
@@ -507,10 +507,18 @@ loadConfigFromFile = function()
             SpeedBtn.BackgroundColor3 = (currentSpeedMultiplier > 1) and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
         end
 
-        if result.autoSummon ~= nil then
-            isAutoSummonEnabled = result.autoSummon
-            AutoSummonBtn.Text = isAutoSummonEnabled and "Auto Summon (10x): ON" or "Auto Summon (10x): OFF"
-            AutoSummonBtn.BackgroundColor3 = isAutoSummonEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+        if result.autoSummonAmount ~= nil then
+            autoSummonAmount = result.autoSummonAmount
+        elseif result.autoSummon ~= nil then
+            autoSummonAmount = result.autoSummon and 10 or 0
+        end
+
+        if autoSummonAmount > 0 then
+            AutoSummonBtn.Text = string.format("Auto Summon (%dx): ON", autoSummonAmount)
+            AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
+        else
+            AutoSummonBtn.Text = "Auto Summon: OFF"
+            AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
         end
 
         if result.mapName then MapNameBox.Text = result.mapName end
@@ -1103,9 +1111,21 @@ AutoVoteDiffBtn.MouseButton1Click:Connect(function()
 end)
 
 AutoSummonBtn.MouseButton1Click:Connect(function()
-    isAutoSummonEnabled = not isAutoSummonEnabled
-    AutoSummonBtn.Text = isAutoSummonEnabled and "Auto Summon (10x): ON" or "Auto Summon (10x): OFF"
-    AutoSummonBtn.BackgroundColor3 = isAutoSummonEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    if autoSummonAmount == 0 then
+        autoSummonAmount = 10
+    elseif autoSummonAmount == 10 then
+        autoSummonAmount = 50
+    else
+        autoSummonAmount = 0
+    end
+
+    if autoSummonAmount > 0 then
+        AutoSummonBtn.Text = string.format("Auto Summon (%dx): ON", autoSummonAmount)
+        AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
+    else
+        AutoSummonBtn.Text = "Auto Summon: OFF"
+        AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+    end
     saveConfigToFile()
 end)
 
@@ -1159,15 +1179,15 @@ end
 task.spawn(function()
     while true do
         task.wait(2)
-        if isAutoSummonEnabled then
+        if autoSummonAmount > 0 then
             pcall(function()
                 local remotes = ReplicatedStorage:FindFirstChild("Remotes")
                 local summonFolder = remotes and remotes:FindFirstChild("Summon")
                 local summonRemote = summonFolder and summonFolder:FindFirstChild("Summon")
 
                 if summonRemote then
-                    summonRemote:InvokeServer(10)
-                    logConsole("Auto Summon (10x) dieksekusi")
+                    summonRemote:InvokeServer(autoSummonAmount)
+                    logConsole(string.format("Auto Summon (%dx) dieksekusi", autoSummonAmount))
                 end
             end)
         end
