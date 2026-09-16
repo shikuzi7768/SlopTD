@@ -28,6 +28,7 @@ local isAutoPlayMultiEnabled = false
 local currentSpeedMultiplier = 1
 local autoSummonAmount = 0 -- 0 = OFF, 10 = 10x, 50 = 50x
 local isAutoAbilityEnabled = false
+local isAutoVoteSkipEnabled = false
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
@@ -134,8 +135,8 @@ end
 ScreenGui.Parent = playerGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 640)
-MainFrame.Position = UDim2.new(0.02, 0, 0.15, 0)
+MainFrame.Size = UDim2.new(0, 240, 0, 680)
+MainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -442,10 +443,22 @@ AutoAbilityBtn.TextSize = 13
 AutoAbilityBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoAbilityBtn).CornerRadius = UDim.new(0, 4)
 
+-- Auto Vote Skip Toggle Button
+local AutoSkipBtn = Instance.new("TextButton")
+AutoSkipBtn.Size = UDim2.new(0.9, 0, 0, 30)
+AutoSkipBtn.Position = UDim2.new(0.05, 0, 0, 445)
+AutoSkipBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+AutoSkipBtn.Text = "Auto Skip Wave: OFF"
+AutoSkipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoSkipBtn.Font = Enum.Font.SourceSansBold
+AutoSkipBtn.TextSize = 13
+AutoSkipBtn.Parent = ContentFrame
+Instance.new("UICorner", AutoSkipBtn).CornerRadius = UDim.new(0, 4)
+
 -- Detailed Status Info Label
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 155)
-StatusLabel.Position = UDim2.new(0.05, 0, 0, 445)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 480)
 StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 StatusLabel.Text = "Status: Ready\nSilahkan pilih Macro atau mulai Recording."
 StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
@@ -465,7 +478,7 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         ContentFrame.Visible = false
         MinimizeBtn.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 240, 0, 640)
+        MainFrame.Size = UDim2.new(0, 240, 0, 680)
         ContentFrame.Visible = true
         MinimizeBtn.Text = "-"
     end
@@ -508,6 +521,7 @@ saveConfigToFile = function()
         speedMultiplier = currentSpeedMultiplier,
         autoSummonAmount = autoSummonAmount,
         autoAbility = isAutoAbilityEnabled,
+        autoVoteSkip = isAutoVoteSkipEnabled,
         mapName = MapNameBox.Text,
         diffName = DiffNameBox.Text,
         selectedMacro = selectedMacroFile,
@@ -565,6 +579,12 @@ loadConfigFromFile = function()
             isAutoAbilityEnabled = result.autoAbility
             AutoAbilityBtn.Text = isAutoAbilityEnabled and "Auto Ability: ON" or "Auto Ability: OFF"
             AutoAbilityBtn.BackgroundColor3 = isAutoAbilityEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+        end
+
+        if result.autoVoteSkip ~= nil then
+            isAutoVoteSkipEnabled = result.autoVoteSkip
+            AutoSkipBtn.Text = isAutoVoteSkipEnabled and "Auto Skip Wave: ON" or "Auto Skip Wave: OFF"
+            AutoSkipBtn.BackgroundColor3 = isAutoVoteSkipEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
         end
 
         if result.mapName then MapNameBox.Text = result.mapName end
@@ -1185,6 +1205,13 @@ AutoAbilityBtn.MouseButton1Click:Connect(function()
     saveConfigToFile()
 end)
 
+AutoSkipBtn.MouseButton1Click:Connect(function()
+    isAutoVoteSkipEnabled = not isAutoVoteSkipEnabled
+    AutoSkipBtn.Text = isAutoVoteSkipEnabled and "Auto Skip Wave: ON" or "Auto Skip Wave: OFF"
+    AutoSkipBtn.BackgroundColor3 = isAutoVoteSkipEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
+end)
+
 SendTradeBtn.MouseButton1Click:Connect(function()
     local targetUsername = TradeUserBox.Text
     if targetUsername == "" or targetUsername == "Username Roblox" then
@@ -1214,11 +1241,11 @@ end)
 loadConfigFromFile()
 
 -- ==========================================
--- AUTO ABILITY LOOP
+-- AUTO ABILITY LOOP (HYBRID TITAN SUPPORT)
 -- ==========================================
 task.spawn(function()
     while true do
-        task.wait(1.5)
+        task.wait(2.5)
         if isAutoAbilityEnabled then
             pcall(function()
                 local events = ReplicatedStorage:FindFirstChild("Events") or ReplicatedStorage:FindFirstChild("Remotes") or ReplicatedStorage
@@ -1230,10 +1257,37 @@ task.spawn(function()
                         if tower:IsA("Model") and tower ~= LocalPlayer.Character then
                             if activateAbilityRemote:IsA("RemoteEvent") then
                                 activateAbilityRemote:FireServer(tower)
+                                activateAbilityRemote:FireServer(tower, 1)
+                                activateAbilityRemote:FireServer(tower, 2)
                             elseif activateAbilityRemote:IsA("RemoteFunction") then
                                 activateAbilityRemote:InvokeServer(tower)
+                                activateAbilityRemote:InvokeServer(tower, 1)
                             end
+                            task.wait(0.2)
                         end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==========================================
+-- AUTO VOTE SKIP LOOP
+-- ==========================================
+task.spawn(function()
+    while true do
+        task.wait(1.5)
+        if isAutoVoteSkipEnabled then
+            pcall(function()
+                local functionsFolder = ReplicatedStorage:FindFirstChild("Functions") or ReplicatedStorage:FindFirstChild("Remotes") or ReplicatedStorage
+                local voteSkipRemote = functionsFolder and functionsFolder:FindFirstChild("VoteSkip", true)
+
+                if voteSkipRemote then
+                    if voteSkipRemote:IsA("RemoteFunction") then
+                        voteSkipRemote:InvokeServer()
+                    elseif voteSkipRemote:IsA("RemoteEvent") then
+                        voteSkipRemote:FireServer()
                     end
                 end
             end)
