@@ -27,6 +27,7 @@ local isAutoPlaySingleEnabled = false
 local isAutoPlayMultiEnabled = false
 local currentSpeedMultiplier = 1
 local autoSummonAmount = 0 -- 0 = OFF, 10 = 10x, 50 = 50x
+local isAutoAbilityEnabled = false
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
@@ -133,8 +134,8 @@ end
 ScreenGui.Parent = playerGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 605)
-MainFrame.Position = UDim2.new(0.02, 0, 0.2, 0)
+MainFrame.Size = UDim2.new(0, 240, 0, 640)
+MainFrame.Position = UDim2.new(0.02, 0, 0.15, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -429,10 +430,22 @@ SendTradeBtn.TextSize = 11
 SendTradeBtn.Parent = ContentFrame
 Instance.new("UICorner", SendTradeBtn).CornerRadius = UDim.new(0, 4)
 
+-- Auto Ability Toggle Button
+local AutoAbilityBtn = Instance.new("TextButton")
+AutoAbilityBtn.Size = UDim2.new(0.9, 0, 0, 30)
+AutoAbilityBtn.Position = UDim2.new(0.05, 0, 0, 410)
+AutoAbilityBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+AutoAbilityBtn.Text = "Auto Ability: OFF"
+AutoAbilityBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoAbilityBtn.Font = Enum.Font.SourceSansBold
+AutoAbilityBtn.TextSize = 13
+AutoAbilityBtn.Parent = ContentFrame
+Instance.new("UICorner", AutoAbilityBtn).CornerRadius = UDim.new(0, 4)
+
 -- Detailed Status Info Label
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 155)
-StatusLabel.Position = UDim2.new(0.05, 0, 0, 410)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 445)
 StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 StatusLabel.Text = "Status: Ready\nSilahkan pilih Macro atau mulai Recording."
 StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
@@ -452,7 +465,7 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         ContentFrame.Visible = false
         MinimizeBtn.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 240, 0, 605)
+        MainFrame.Size = UDim2.new(0, 240, 0, 640)
         ContentFrame.Visible = true
         MinimizeBtn.Text = "-"
     end
@@ -494,6 +507,7 @@ saveConfigToFile = function()
         autoVoteDiff = isAutoVoteDiffEnabled,
         speedMultiplier = currentSpeedMultiplier,
         autoSummonAmount = autoSummonAmount,
+        autoAbility = isAutoAbilityEnabled,
         mapName = MapNameBox.Text,
         diffName = DiffNameBox.Text,
         selectedMacro = selectedMacroFile,
@@ -545,6 +559,12 @@ loadConfigFromFile = function()
         else
             AutoSummonBtn.Text = "Auto Summon: OFF"
             AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+        end
+
+        if result.autoAbility ~= nil then
+            isAutoAbilityEnabled = result.autoAbility
+            AutoAbilityBtn.Text = isAutoAbilityEnabled and "Auto Ability: ON" or "Auto Ability: OFF"
+            AutoAbilityBtn.BackgroundColor3 = isAutoAbilityEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
         end
 
         if result.mapName then MapNameBox.Text = result.mapName end
@@ -1158,7 +1178,13 @@ AutoSummonBtn.MouseButton1Click:Connect(function()
     saveConfigToFile()
 end)
 
--- LOGIKA SEND TRADE BUTTON
+AutoAbilityBtn.MouseButton1Click:Connect(function()
+    isAutoAbilityEnabled = not isAutoAbilityEnabled
+    AutoAbilityBtn.Text = isAutoAbilityEnabled and "Auto Ability: ON" or "Auto Ability: OFF"
+    AutoAbilityBtn.BackgroundColor3 = isAutoAbilityEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
+end)
+
 SendTradeBtn.MouseButton1Click:Connect(function()
     local targetUsername = TradeUserBox.Text
     if targetUsername == "" or targetUsername == "Username Roblox" then
@@ -1186,6 +1212,34 @@ SendTradeBtn.MouseButton1Click:Connect(function()
 end)
 
 loadConfigFromFile()
+
+-- ==========================================
+-- AUTO ABILITY LOOP
+-- ==========================================
+task.spawn(function()
+    while true do
+        task.wait(1.5)
+        if isAutoAbilityEnabled then
+            pcall(function()
+                local events = ReplicatedStorage:FindFirstChild("Events") or ReplicatedStorage:FindFirstChild("Remotes") or ReplicatedStorage
+                local activateAbilityRemote = events:FindFirstChild("ActivateAbility", true)
+
+                if activateAbilityRemote then
+                    local towersFolder = Workspace:FindFirstChild("Towers") or Workspace
+                    for _, tower in ipairs(towersFolder:GetChildren()) do
+                        if tower:IsA("Model") and tower ~= LocalPlayer.Character then
+                            if activateAbilityRemote:IsA("RemoteEvent") then
+                                activateAbilityRemote:FireServer(tower)
+                            elseif activateAbilityRemote:IsA("RemoteFunction") then
+                                activateAbilityRemote:InvokeServer(tower)
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
 
 -- ==========================================
 -- SMART AUTO VOTE MAP FUNCTION
