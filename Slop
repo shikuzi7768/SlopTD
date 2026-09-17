@@ -41,6 +41,7 @@ local isAutoReplayEnabled = false
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
+local matchHasStarted = false
 
 -- Auto Vote Variables
 local isAutoVoteEnabled = false
@@ -1473,26 +1474,43 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- HELPER DETEKSI MATCH SELESAI (WIN / LOSE)
+-- DETEKSI MATCH & REPLAY SYSTEM (STRICT SAFETY)
 -- ==========================================
+
+local function isMatchActuallyStarted()
+    local functionsFolder = ReplicatedStorage:FindFirstChild("Functions")
+    local spawnRemote = functionsFolder and functionsFolder:FindFirstChild("SpawnTower")
+    local mapFolder = Workspace:FindFirstChild("Map") or Workspace:FindFirstChild("Board")
+    return (spawnRemote ~= nil and mapFolder ~= nil)
+end
 
 local function isMatchEnded()
     local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
     if not playerGui then return false end
     
-    -- Memeriksa UI yang muncul saat match selesai
+    -- Abaikan jika UI Vote Map / Intermission sedang aktif di layar
     for _, gui in ipairs(playerGui:GetChildren()) do
         if gui:IsA("ScreenGui") and gui.Enabled then
             local guiName = string.lower(gui.Name)
-            if string.find(guiName, "end") or string.find(guiName, "result") or string.find(guiName, "gameover") or string.find(guiName, "victory") or string.find(guiName, "win") or string.find(guiName, "defeat") then
+            if string.find(guiName, "vote") or string.find(guiName, "intermission") then
+                return false
+            end
+        end
+    end
+    
+    -- Memeriksa UI khusus End Game
+    for _, gui in ipairs(playerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled then
+            local guiName = string.lower(gui.Name)
+            if string.find(guiName, "endgame") or string.find(guiName, "result") or string.find(guiName, "gameover") or string.find(guiName, "victory") or string.find(guiName, "defeat") or string.find(guiName, "summary") then
                 return true
             end
             
-            -- Memeriksa teks di dalam elemen UI (Victory / Defeat / Game Over / Replay)
+            -- Memeriksa teks spesifik di dalam elemen UI
             for _, desc in ipairs(gui:GetDescendants()) do
                 if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and desc.Visible then
                     local text = string.lower(desc.Text)
-                    if string.find(text, "victory") or string.find(text, "defeat") or string.find(text, "game over") or string.find(text, "you win") or string.find(text, "you lose") or string.find(text, "replay") or string.find(text, "rewards") then
+                    if string.find(text, "victory") or string.find(text, "defeat") or string.find(text, "game over") or string.find(text, "you win") or string.find(text, "you lose") or string.find(text, "replay") or text == "retry" then
                         return true
                     end
                 end
@@ -1508,8 +1526,15 @@ end
 
 task.spawn(function()
     while true do
-        task.wait(2)
-        if isAutoReplayEnabled and isMatchEnded() then
+        task.wait(1)
+        
+        -- Tandai bahwa match resmi sudah dimulai
+        if isMatchActuallyStarted() then
+            matchHasStarted = true
+        end
+
+        -- Auto Replay HANYA aktif jika match SUDAH pernah berjalan DAN UI match selesai terdeteksi
+        if isAutoReplayEnabled and matchHasStarted and isMatchEnded() then
             pcall(function()
                 local events = ReplicatedStorage:FindFirstChild("Events") or ReplicatedStorage:FindFirstChild("Remotes") or ReplicatedStorage
                 local endDecisionRemote = events and events:FindFirstChild("EndDecision", true)
@@ -1522,8 +1547,9 @@ task.spawn(function()
                     logConsole("[Auto Replay]: Match selesai terdeteksi, replay dikirim.")
                 end
             end)
-            -- Jeda 5 detik agar tidak melakukan spam remote saat layar hasil masih tampil
-            task.wait(5)
+            
+            matchHasStarted = false -- Reset status agar tidak memicu replay sebelum match berikutnya
+            task.wait(6)
         end
     end
 end)
@@ -1766,13 +1792,6 @@ end)
 -- ==========================================
 -- AUTO PLAY & VOTE LOOP
 -- ==========================================
-
-local function isMatchActuallyStarted()
-    local functionsFolder = ReplicatedStorage:FindFirstChild("Functions")
-    local spawnRemote = functionsFolder and functionsFolder:FindFirstChild("SpawnTower")
-    local mapFolder = Workspace:FindFirstChild("Map") or Workspace:FindFirstChild("Board")
-    return (spawnRemote ~= nil and mapFolder ~= nil)
-end
 
 task.spawn(function()
     while true do
