@@ -1473,13 +1473,43 @@ task.spawn(function()
 end)
 
 -- ==========================================
+-- HELPER DETEKSI MATCH SELESAI (WIN / LOSE)
+-- ==========================================
+
+local function isMatchEnded()
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return false end
+    
+    -- Memeriksa UI yang muncul saat match selesai
+    for _, gui in ipairs(playerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled then
+            local guiName = string.lower(gui.Name)
+            if string.find(guiName, "end") or string.find(guiName, "result") or string.find(guiName, "gameover") or string.find(guiName, "victory") or string.find(guiName, "win") or string.find(guiName, "defeat") then
+                return true
+            end
+            
+            -- Memeriksa teks di dalam elemen UI (Victory / Defeat / Game Over / Replay)
+            for _, desc in ipairs(gui:GetDescendants()) do
+                if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and desc.Visible then
+                    local text = string.lower(desc.Text)
+                    if string.find(text, "victory") or string.find(text, "defeat") or string.find(text, "game over") or string.find(text, "you win") or string.find(text, "you lose") or string.find(text, "replay") or string.find(text, "rewards") then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+-- ==========================================
 -- AUTO REPLAY MATCH LOOP
 -- ==========================================
 
 task.spawn(function()
     while true do
-        task.wait(1.5)
-        if isAutoReplayEnabled then
+        task.wait(2)
+        if isAutoReplayEnabled and isMatchEnded() then
             pcall(function()
                 local events = ReplicatedStorage:FindFirstChild("Events") or ReplicatedStorage:FindFirstChild("Remotes") or ReplicatedStorage
                 local endDecisionRemote = events and events:FindFirstChild("EndDecision", true)
@@ -1489,8 +1519,11 @@ task.spawn(function()
                     elseif endDecisionRemote:IsA("RemoteFunction") then
                         endDecisionRemote:InvokeServer(true)
                     end
+                    logConsole("[Auto Replay]: Match selesai terdeteksi, replay dikirim.")
                 end
             end)
+            -- Jeda 5 detik agar tidak melakukan spam remote saat layar hasil masih tampil
+            task.wait(5)
         end
     end
 end)
