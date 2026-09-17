@@ -1539,24 +1539,81 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO ANTI MACRO LOOP
+-- AUTO ANTI MACRO LOOP (DYNAMIC UI CLICKER)
 -- ==========================================
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local function clickAntiMacroUI()
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return false end
+
+    -- Pindai seluruh ScreenGui yang sedang aktif
+    for _, gui in ipairs(playerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled then
+            local guiName = string.lower(gui.Name)
+            
+            -- Deteksi nama GUI yang berkaitan dengan Anti Macro / Captcha / Check
+            if string.find(guiName, "macro") or string.find(guiName, "captcha") or string.find(guiName, "anti") or string.find(guiName, "check") then
+                for _, element in ipairs(gui:GetDescendants()) do
+                    if (element:IsA("TextButton") or element:IsA("ImageButton")) and element.Visible and element.AbsoluteSize.X > 0 then
+                        
+                        -- Metode 1: Menggunakan firesignal (Executor umum seperti Solara/Celery/Wave)
+                        if firesignal then
+                            pcall(function() firesignal(element.MouseButton1Click) end)
+                            pcall(function() firesignal(element.Activated) end)
+                        end
+                        
+                        -- Metode 2: Menggunakan getconnections
+                        if getconnections then
+                            pcall(function()
+                                for _, conn in ipairs(getconnections(element.MouseButton1Click)) do conn:Fire() end
+                                for _, conn in ipairs(getconnections(element.Activated)) do conn:Fire() end
+                            end)
+                        end
+
+                        -- Metode 3: Klik posisi koordinat tombol layar menggunakan VirtualInputManager
+                        pcall(function()
+                            local centerPos = element.AbsolutePosition + (element.AbsoluteSize / 2)
+                            -- Inset Topbar Roblox default sekitar 36px
+                            local clickX = centerPos.X
+                            local clickY = centerPos.Y + 36 
+
+                            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
+                            task.wait(0.05)
+                            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
+                        end)
+
+                        logConsole("Anti Macro UI Button berhasil diklik pada posisi dynamic!")
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
 task.spawn(function()
     while true do
-        task.wait(1)
+        task.wait(0.5) -- Interval cek dipercepat agar cepat merespons
         if isAutoAntiMacroEnabled then
             pcall(function()
-                local events = ReplicatedStorage:FindFirstChild("Events")
-                local antiMacroFolder = events and events:FindFirstChild("AntiMacro")
-                local respondRemote = antiMacroFolder and antiMacroFolder:FindFirstChild("Respond")
+                -- Coba klik tombol UI terlebih dahulu
+                local clicked = clickAntiMacroUI()
 
-                if respondRemote then
-                    if respondRemote:IsA("RemoteEvent") then
-                        respondRemote:FireServer("e2b55632-9fbd-4844-8799-e31fbeaed08b")
-                    elseif respondRemote:IsA("RemoteFunction") then
-                        respondRemote:InvokeServer("e2b55632-9fbd-4844-8799-e31fbeaed08b")
+                -- Fallback: Jika tidak menemukan UI, tetap jalankan kirim RemoteEvent
+                if not clicked then
+                    local events = ReplicatedStorage:FindFirstChild("Events")
+                    local antiMacroFolder = events and events:FindFirstChild("AntiMacro")
+                    local respondRemote = antiMacroFolder and antiMacroFolder:FindFirstChild("Respond")
+
+                    if respondRemote then
+                        if respondRemote:IsA("RemoteEvent") then
+                            respondRemote:FireServer("e2b55632-9fbd-4844-8799-e31fbeaed08b")
+                        elseif respondRemote:IsA("RemoteFunction") then
+                            respondRemote:InvokeServer("e2b55632-9fbd-4844-8799-e31fbeaed08b")
+                        end
                     end
-                    logConsole("Auto Anti Macro Respond dieksekusi")
                 end
             end)
         end
