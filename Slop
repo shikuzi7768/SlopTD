@@ -2,6 +2,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
+local GuiService = game:GetService("GuiService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
 -- Check Executor File System Support
@@ -1385,7 +1387,7 @@ end)
 
 AutoSkipBtn.MouseButton1Click:Connect(function()
     isAutoVoteSkipEnabled = not isAutoVoteSkipEnabled
-    AutoSkipBtn.Text = isAutoSkipBtn and "Auto Skip Wave: ON" or "Auto Skip Wave: OFF"
+    AutoSkipBtn.Text = isAutoVoteSkipEnabled and "Auto Skip Wave: ON" or "Auto Skip Wave: OFF"
     AutoSkipBtn.BackgroundColor3 = isAutoVoteSkipEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
     saveConfigToFile()
 end)
@@ -1553,41 +1555,61 @@ end)
 -- AUTO ANTI MACRO LOOP (DYNAMIC UI CLICKER)
 -- ==========================================
 
-local VirtualInputManager = game:GetService("VirtualInputManager")
-
 local function clickAntiMacroUI()
     local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
     if not playerGui then return false end
 
     for _, gui in ipairs(playerGui:GetChildren()) do
         if gui:IsA("ScreenGui") and gui.Enabled then
-            local guiName = string.lower(gui.Name)
-            if string.find(guiName, "macro") or string.find(guiName, "captcha") or string.find(guiName, "anti") or string.find(guiName, "check") then
-                for _, element in ipairs(gui:GetDescendants()) do
-                    if (element:IsA("TextButton") or element:IsA("ImageButton")) and element.Visible and element.AbsoluteSize.X > 0 then
-                        if firesignal then
-                            pcall(function() firesignal(element.MouseButton1Click) end)
-                            pcall(function() firesignal(element.Activated) end)
+            for _, element in ipairs(gui:GetDescendants()) do
+                if element:IsA("TextButton") or element:IsA("TextLabel") or element:IsA("ImageButton") then
+                    local text = ""
+                    
+                    if element:IsA("TextButton") or element:IsA("TextLabel") then
+                        text = string.lower(element.Text)
+                    end
+                    
+                    if text == "" then
+                        local childLabel = element:FindFirstChildWhichIsA("TextLabel")
+                        if childLabel then
+                            text = string.lower(childLabel.Text)
+                        end
+                    end
+
+                    if string.find(text, "i'm here") or string.find(text, "here") then
+                        local targetButton = element
+                        if element:IsA("TextLabel") and (element.Parent:IsA("TextButton") or element.Parent:IsA("ImageButton")) then
+                            targetButton = element.Parent
                         end
 
-                        if getconnections then
+                        if targetButton.Visible and targetButton.AbsoluteSize.X > 0 then
+                            if firesignal then
+                                pcall(function() firesignal(targetButton.MouseButton1Click) end)
+                                pcall(function() firesignal(targetButton.Activated) end)
+                            end
+
+                            if getconnections then
+                                pcall(function()
+                                    for _, conn in ipairs(getconnections(targetButton.MouseButton1Click)) do conn:Fire() end
+                                    for _, conn in ipairs(getconnections(targetButton.Activated)) do conn:Fire() end
+                                end)
+                            end
+
                             pcall(function()
-                                for _, conn in ipairs(getconnections(element.MouseButton1Click)) do conn:Fire() end
-                                for _, conn in ipairs(getconnections(element.Activated)) do conn:Fire() end
+                                local guiInset = GuiService:GetGuiInset()
+                                local centerPos = targetButton.AbsolutePosition + (targetButton.AbsoluteSize / 2)
+                                
+                                local clickX = centerPos.X
+                                local clickY = centerPos.Y + guiInset.Y
+
+                                VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
+                                task.wait(0.05)
+                                VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
                             end)
+
+                            logConsole(string.format("Anti Macro UI ditemukan ('%s') & berhasil diklik!", text))
+                            return true
                         end
-
-                        pcall(function()
-                            local centerPos = element.AbsolutePosition + (element.AbsoluteSize / 2)
-                            local clickX = centerPos.X
-                            local clickY = centerPos.Y + 36
-                            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
-                            task.wait(0.05)
-                            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
-                        end)
-
-                        logConsole("Anti Macro UI Button berhasil diklik pada posisi dynamic!")
-                        return true
                     end
                 end
             end
