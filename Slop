@@ -1359,65 +1359,72 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO ANTI MACRO LOOP
+-- AUTO ANTI MACRO LOOP (ENHANCED)
 -- ==========================================
 
 local function clickAntiMacroUI()
     local pGui = LocalPlayer:FindFirstChild("PlayerGui")
     if not pGui then return false end
 
-    for _, gui in ipairs(pGui:GetChildren()) do
-        if gui:IsA("ScreenGui") and gui.Enabled then
-            for _, element in ipairs(gui:GetDescendants()) do
-                if element:IsA("TextButton") or element:IsA("TextLabel") or element:IsA("ImageButton") then
-                    local text = ""
-                    
-                    if element:IsA("TextButton") or element:IsA("TextLabel") then
-                        text = string.lower(element.Text)
+    -- Pemindaian mendalam ke seluruh objek di PlayerGui
+    for _, element in ipairs(pGui:GetDescendants()) do
+        if element:IsA("TextButton") or element:IsA("TextLabel") or element:IsA("ImageButton") then
+            local text = ""
+            if element:IsA("TextButton") or element:IsA("TextLabel") then
+                text = string.lower(element.Text or "")
+            end
+            
+            -- Membersihkan tag RichText jika ada
+            text = text:gsub("<[^>]-|>", "")
+
+            if string.find(text, "i'm here") or string.find(text, "here") then
+                -- Cari elemen tombol utama
+                local targetButton = element
+                if element:IsA("TextLabel") then
+                    targetButton = element:FindFirstAncestorOfClass("TextButton") 
+                                or element:FindFirstAncestorOfClass("ImageButton") 
+                                or element.Parent
+                end
+
+                if targetButton and targetButton:IsA("GuiObject") then
+                    -- 1. Simulasi Signal Klik (PC & Mobile)
+                    if firesignal then
+                        pcall(function() firesignal(targetButton.MouseButton1Click) end)
+                        pcall(function() firesignal(targetButton.Activated) end)
+                        pcall(function() firesignal(targetButton.TouchTap) end)
                     end
-                    
-                    if text == "" then
-                        local childLabel = element:FindFirstChildWhichIsA("TextLabel")
-                        if childLabel then
-                            text = string.lower(childLabel.Text)
-                        end
+
+                    if getconnections then
+                        pcall(function()
+                            for _, conn in ipairs(getconnections(targetButton.MouseButton1Click)) do conn:Fire() end
+                            for _, conn in ipairs(getconnections(targetButton.Activated)) do conn:Fire() end
+                            for _, conn in ipairs(getconnections(targetButton.TouchTap)) do conn:Fire() end
+                        end)
                     end
 
-                    if string.find(text, "i'm here") or string.find(text, "here") then
-                        local targetButton = element
-                        if element:IsA("TextLabel") and (element.Parent:IsA("TextButton") or element.Parent:IsA("ImageButton")) then
-                            targetButton = element.Parent
+                    -- 2. Simulasi Input Posisi Layar (Mouse + Touch Screen Mobile)
+                    pcall(function()
+                        local absPos = targetButton.AbsolutePosition
+                        local absSize = targetButton.AbsoluteSize
+                        if absSize.X > 0 and absSize.Y > 0 then
+                            local guiInset = GuiService:GetGuiInset()
+                            local clickX = absPos.X + (absSize.X / 2)
+                            local clickY = absPos.Y + (absSize.Y / 2) + guiInset.Y
+
+                            -- Simulasikan Mouse Event
+                            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
+                            task.wait(0.05)
+                            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
+
+                            -- Simulasikan Touch Event khusus Mobile
+                            VirtualInputManager:SendTouchEvent(1, 0, clickX, clickY)
+                            task.wait(0.05)
+                            VirtualInputManager:SendTouchEvent(1, 2, clickX, clickY)
                         end
+                    end)
 
-                        if targetButton.Visible and targetButton.AbsoluteSize.X > 0 then
-                            if firesignal then
-                                pcall(function() firesignal(targetButton.MouseButton1Click) end)
-                                pcall(function() firesignal(targetButton.Activated) end)
-                            end
-
-                            if getconnections then
-                                pcall(function()
-                                    for _, conn in ipairs(getconnections(targetButton.MouseButton1Click)) do conn:Fire() end
-                                    for _, conn in ipairs(getconnections(targetButton.Activated)) do conn:Fire() end
-                                end)
-                            end
-
-                            pcall(function()
-                                local guiInset = GuiService:GetGuiInset()
-                                local centerPos = targetButton.AbsolutePosition + (targetButton.AbsoluteSize / 2)
-                                
-                                local clickX = centerPos.X
-                                local clickY = centerPos.Y + guiInset.Y
-
-                                VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
-                                task.wait(0.05)
-                                VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
-                            end)
-
-                            logConsole(string.format("Anti Macro UI ditemukan ('%s') & berhasil diklik!", text))
-                            return true
-                        end
-                    end
+                    logConsole(string.format("Anti Macro UI ditemukan ('%s') & berhasil diklik!", text))
+                    return true
                 end
             end
         end
@@ -1431,15 +1438,36 @@ task.spawn(function()
         if isAutoAntiMacroEnabled then
             pcall(function()
                 local clicked = clickAntiMacroUI()
+                
+                -- Jika tombol UI tidak bisa diklik langsung, cari token acak dari UI / Remote
                 if not clicked then
                     local events = LocalReplicatedStorage:FindFirstChild("Events")
                     local antiMacroFolder = events and events:FindFirstChild("AntiMacro")
                     local respondRemote = antiMacroFolder and antiMacroFolder:FindFirstChild("Respond")
+                    
                     if respondRemote then
-                        if respondRemote:IsA("RemoteEvent") then
-                            respondRemote:FireServer("e2b55632-9fbd-4844-8799-e31fbeaed08b")
-                        elseif respondRemote:IsA("RemoteFunction") then
-                            respondRemote:InvokeServer("e2b55632-9fbd-4844-8799-e31fbeaed08b")
+                        -- Mengambil dynamic code/attribute yang tersimpan di GUI jika ada
+                        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+                        local dynamicCode = nil
+                        
+                        if pGui then
+                            for _, obj in ipairs(pGui:GetDescendants()) do
+                                if obj:IsA("StringValue") and #obj.Value > 10 then
+                                    dynamicCode = obj.Value
+                                    break
+                                elseif obj:GetAttribute("Code") or obj:GetAttribute("Token") then
+                                    dynamicCode = obj:GetAttribute("Code") or obj:GetAttribute("Token")
+                                    break
+                                end
+                            end
+                        end
+                        
+                        if dynamicCode then
+                            if respondRemote:IsA("RemoteEvent") then
+                                respondRemote:FireServer(dynamicCode)
+                            elseif respondRemote:IsA("RemoteFunction") then
+                                respondRemote:InvokeServer(dynamicCode)
+                            end
                         end
                     end
                 end
