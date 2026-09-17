@@ -32,6 +32,7 @@ local autoCrateAmount = 0 -- 0 = OFF, 1 = 1x, 10 = 10x, 25 = 25x
 local autoBuyCrateAmount = 0 -- 0 = OFF, 1 = 1x, 3 = 3x, 10 = 10x
 local isAutoAbilityEnabled = false
 local isAutoVoteSkipEnabled = false
+local isAutoAntiMacroEnabled = false
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
@@ -138,7 +139,7 @@ end
 ScreenGui.Parent = playerGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 780)
+MainFrame.Size = UDim2.new(0, 240, 0, 815)
 MainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
@@ -507,10 +508,22 @@ AutoBuyCrateBtn.TextSize = 13
 AutoBuyCrateBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoBuyCrateBtn).CornerRadius = UDim.new(0, 4)
 
+-- Auto Anti Macro Toggle Button
+local AutoAntiMacroBtn = Instance.new("TextButton")
+AutoAntiMacroBtn.Size = UDim2.new(0.9, 0, 0, 30)
+AutoAntiMacroBtn.Position = UDim2.new(0.05, 0, 0, 585)
+AutoAntiMacroBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+AutoAntiMacroBtn.Text = "Auto Anti Macro: OFF"
+AutoAntiMacroBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoAntiMacroBtn.Font = Enum.Font.SourceSansBold
+AutoAntiMacroBtn.TextSize = 13
+AutoAntiMacroBtn.Parent = ContentFrame
+Instance.new("UICorner", AutoAntiMacroBtn).CornerRadius = UDim.new(0, 4)
+
 -- Detailed Status Info Label
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 155)
-StatusLabel.Position = UDim2.new(0.05, 0, 0, 585)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 620)
 StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 StatusLabel.Text = "Status: Ready\nSilahkan pilih Macro atau mulai Recording."
 StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
@@ -530,7 +543,7 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         ContentFrame.Visible = false
         MinimizeBtn.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 240, 0, 780)
+        MainFrame.Size = UDim2.new(0, 240, 0, 815)
         ContentFrame.Visible = true
         MinimizeBtn.Text = "-"
     end
@@ -577,6 +590,7 @@ saveConfigToFile = function()
         autoBuyCrateAmount = autoBuyCrateAmount,
         autoAbility = isAutoAbilityEnabled,
         autoVoteSkip = isAutoVoteSkipEnabled,
+        autoAntiMacro = isAutoAntiMacroEnabled,
         mapName = MapNameBox.Text,
         diffName = DiffNameBox.Text,
         crateName = CrateNameBox.Text,
@@ -677,6 +691,12 @@ loadConfigFromFile = function()
             isAutoVoteSkipEnabled = result.autoVoteSkip
             AutoSkipBtn.Text = isAutoVoteSkipEnabled and "Auto Skip Wave: ON" or "Auto Skip Wave: OFF"
             AutoSkipBtn.BackgroundColor3 = isAutoVoteSkipEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+        end
+
+        if result.autoAntiMacro ~= nil then
+            isAutoAntiMacroEnabled = result.autoAntiMacro
+            AutoAntiMacroBtn.Text = isAutoAntiMacroEnabled and "Auto Anti Macro: ON" or "Auto Anti Macro: OFF"
+            AutoAntiMacroBtn.BackgroundColor3 = isAutoAntiMacroEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
         end
 
         if result.mapName then MapNameBox.Text = result.mapName end
@@ -1358,6 +1378,13 @@ AutoBuyCrateBtn.MouseButton1Click:Connect(function()
     saveConfigToFile()
 end)
 
+AutoAntiMacroBtn.MouseButton1Click:Connect(function()
+    isAutoAntiMacroEnabled = not isAutoAntiMacroEnabled
+    AutoAntiMacroBtn.Text = isAutoAntiMacroEnabled and "Auto Anti Macro: ON" or "Auto Anti Macro: OFF"
+    AutoAntiMacroBtn.BackgroundColor3 = isAutoAntiMacroEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
+end)
+
 AutoAbilityBtn.MouseButton1Click:Connect(function()
     isAutoAbilityEnabled = not isAutoAbilityEnabled
     AutoAbilityBtn.Text = isAutoAbilityEnabled and "Auto Ability: ON" or "Auto Ability: OFF"
@@ -1505,6 +1532,31 @@ task.spawn(function()
                         end
                         logConsole(string.format("Auto Buy Crate (%s x%d) dieksekusi", crateName, autoBuyCrateAmount))
                     end
+                end
+            end)
+        end
+    end
+end)
+
+-- ==========================================
+-- AUTO ANTI MACRO LOOP
+-- ==========================================
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if isAutoAntiMacroEnabled then
+            pcall(function()
+                local events = ReplicatedStorage:FindFirstChild("Events")
+                local antiMacroFolder = events and events:FindFirstChild("AntiMacro")
+                local respondRemote = antiMacroFolder and antiMacroFolder:FindFirstChild("Respond")
+
+                if respondRemote then
+                    if respondRemote:IsA("RemoteEvent") then
+                        respondRemote:FireServer("e2b55632-9fbd-4844-8799-e31fbeaed08b")
+                    elseif respondRemote:IsA("RemoteFunction") then
+                        respondRemote:InvokeServer("e2b55632-9fbd-4844-8799-e31fbeaed08b")
+                    end
+                    logConsole("Auto Anti Macro Respond dieksekusi")
                 end
             end)
         end
