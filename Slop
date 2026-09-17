@@ -1359,50 +1359,56 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO ANTI MACRO LOOP (ENHANCED)
+-- AUTO ANTI MACRO LOOP (ENHANCED & FIXED)
 -- ==========================================
 
 local function clickAntiMacroUI()
     local pGui = LocalPlayer:FindFirstChild("PlayerGui")
     if not pGui then return false end
 
-    -- Pemindaian mendalam ke seluruh objek di PlayerGui
     for _, element in ipairs(pGui:GetDescendants()) do
-        if element:IsA("TextButton") or element:IsA("TextLabel") or element:IsA("ImageButton") then
-            local text = ""
-            if element:IsA("TextButton") or element:IsA("TextLabel") then
-                text = string.lower(element.Text or "")
+        if element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("ImageButton") then
+            local rawText = ""
+            if element:IsA("TextLabel") or element:IsA("TextButton") then
+                rawText = element.Text or ""
             end
             
-            -- Membersihkan tag RichText jika ada
-            text = text:gsub("<[^>]-|>", "")
+            -- Clean rich text tags & ubah ke lowercase
+            local cleanText = rawText:gsub("<[^>]->", ""):lower()
+            -- Hapus tanda baca & spasi agar aman dari perbedaan karakter ' dan ’
+            local normalizedText = cleanText:gsub("[%p%s]", "") 
 
-            if string.find(text, "i'm here") or string.find(text, "here") then
-                -- Cari elemen tombol utama
+            -- Cek variasi teks "I'm here" atau "here"
+            if normalizedText:find("imhere") or normalizedText:find("iamhere") or (normalizedText:find("here") and normalizedText:find("still")) then
                 local targetButton = element
-                if element:IsA("TextLabel") then
+                if not (targetButton:IsA("TextButton") or targetButton:IsA("ImageButton")) then
                     targetButton = element:FindFirstAncestorOfClass("TextButton") 
                                 or element:FindFirstAncestorOfClass("ImageButton") 
                                 or element.Parent
                 end
 
                 if targetButton and targetButton:IsA("GuiObject") then
-                    -- 1. Simulasi Signal Klik (PC & Mobile)
+                    local eventsToFire = {"MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "Activated", "TouchTap"}
+                    
+                    -- 1. Firesignal untuk executor modern
                     if firesignal then
-                        pcall(function() firesignal(targetButton.MouseButton1Click) end)
-                        pcall(function() firesignal(targetButton.Activated) end)
-                        pcall(function() firesignal(targetButton.TouchTap) end)
+                        for _, eventName in ipairs(eventsToFire) do
+                            pcall(function() firesignal(targetButton[eventName]) end)
+                        end
                     end
 
+                    -- 2. Trigger koneksi script internal game
                     if getconnections then
-                        pcall(function()
-                            for _, conn in ipairs(getconnections(targetButton.MouseButton1Click)) do conn:Fire() end
-                            for _, conn in ipairs(getconnections(targetButton.Activated)) do conn:Fire() end
-                            for _, conn in ipairs(getconnections(targetButton.TouchTap)) do conn:Fire() end
-                        end)
+                        for _, eventName in ipairs(eventsToFire) do
+                            pcall(function()
+                                for _, conn in ipairs(getconnections(targetButton[eventName])) do
+                                    conn:Fire()
+                                end
+                            end)
+                        end
                     end
 
-                    -- 2. Simulasi Input Posisi Layar (Mouse + Touch Screen Mobile)
+                    -- 3. Simulasi Input Posisi Layar (Virtual Mouse & Touch Screen)
                     pcall(function()
                         local absPos = targetButton.AbsolutePosition
                         local absSize = targetButton.AbsoluteSize
@@ -1411,19 +1417,19 @@ local function clickAntiMacroUI()
                             local clickX = absPos.X + (absSize.X / 2)
                             local clickY = absPos.Y + (absSize.Y / 2) + guiInset.Y
 
-                            -- Simulasikan Mouse Event
+                            -- Mouse Click Event
                             VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
-                            task.wait(0.05)
+                            task.wait(0.02)
                             VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
 
-                            -- Simulasikan Touch Event khusus Mobile
+                            -- Mobile Touch Event
                             VirtualInputManager:SendTouchEvent(1, 0, clickX, clickY)
-                            task.wait(0.05)
+                            task.wait(0.02)
                             VirtualInputManager:SendTouchEvent(1, 2, clickX, clickY)
                         end
                     end)
 
-                    logConsole(string.format("Anti Macro UI ditemukan ('%s') & berhasil diklik!", text))
+                    logConsole(string.format("Anti Macro UI ditemukan ('%s') & berhasil diklik!", rawText))
                     return true
                 end
             end
