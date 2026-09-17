@@ -1359,7 +1359,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO ANTI MACRO LOOP (ENHANCED & FIXED)
+-- AUTO ANTI MACRO LOOP (FIXED POSITION)
 -- ==========================================
 
 local function clickAntiMacroUI()
@@ -1373,65 +1373,65 @@ local function clickAntiMacroUI()
                 rawText = element.Text or ""
             end
             
-            -- Clean rich text tags & ubah ke lowercase
+            -- Clean rich text tags & lower case
             local cleanText = rawText:gsub("<[^>]->", ""):lower()
-            -- Hapus tanda baca & spasi agar aman dari perbedaan karakter ' dan ’
             local normalizedText = cleanText:gsub("[%p%s]", "") 
 
-            -- Cek variasi teks "I'm here" atau "here"
+            -- Cek variasi teks "I'm here"
             if normalizedText:find("imhere") or normalizedText:find("iamhere") or (normalizedText:find("here") and normalizedText:find("still")) then
-                local targetButton = element
-                if not (targetButton:IsA("TextButton") or targetButton:IsA("ImageButton")) then
-                    targetButton = element:FindFirstAncestorOfClass("TextButton") 
-                                or element:FindFirstAncestorOfClass("ImageButton") 
-                                or element.Parent
+                -- UTAMAKAN KOORDINAT DARI ELEMEN TEKS ITU SENDIRI (TextLabel / TextButton)
+                -- AGAR TIDAK SALAH MEMILIH PARENT FRAME DI TENGAH LAYAR
+                local absPos = element.AbsolutePosition
+                local absSize = element.AbsoluteSize
+                
+                local ancestorButton = element:FindFirstAncestorOfClass("TextButton") 
+                                    or element:FindFirstAncestorOfClass("ImageButton")
+
+                local eventsToFire = {"MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "Activated", "TouchTap"}
+                local targetsToTrigger = {element, ancestorButton, element.Parent}
+
+                -- 1. Trigger via firesignal & connections ke elemen teks & induknya
+                for _, targetObj in ipairs(targetsToTrigger) do
+                    if targetObj and targetObj:IsA("GuiObject") then
+                        if firesignal then
+                            for _, eventName in ipairs(eventsToFire) do
+                                pcall(function() firesignal(targetObj[eventName]) end)
+                            end
+                        end
+
+                        if getconnections then
+                            for _, eventName in ipairs(eventsToFire) do
+                                pcall(function()
+                                    for _, conn in ipairs(getconnections(targetObj[eventName])) do
+                                        conn:Fire()
+                                    end
+                                end)
+                            end
+                        end
+                    end
                 end
 
-                if targetButton and targetButton:IsA("GuiObject") then
-                    local eventsToFire = {"MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "Activated", "TouchTap"}
-                    
-                    -- 1. Firesignal untuk executor modern
-                    if firesignal then
-                        for _, eventName in ipairs(eventsToFire) do
-                            pcall(function() firesignal(targetButton[eventName]) end)
-                        end
-                    end
-
-                    -- 2. Trigger koneksi script internal game
-                    if getconnections then
-                        for _, eventName in ipairs(eventsToFire) do
-                            pcall(function()
-                                for _, conn in ipairs(getconnections(targetButton[eventName])) do
-                                    conn:Fire()
-                                end
-                            end)
-                        end
-                    end
-
-                    -- 3. Simulasi Input Posisi Layar (Virtual Mouse & Touch Screen)
+                -- 2. Simulasi Input Fisik Layar (Tepat di koordinat teks "I'm here")
+                if absSize.X > 0 and absSize.Y > 0 then
                     pcall(function()
-                        local absPos = targetButton.AbsolutePosition
-                        local absSize = targetButton.AbsoluteSize
-                        if absSize.X > 0 and absSize.Y > 0 then
-                            local guiInset = GuiService:GetGuiInset()
-                            local clickX = absPos.X + (absSize.X / 2)
-                            local clickY = absPos.Y + (absSize.Y / 2) + guiInset.Y
+                        local guiInset = GuiService:GetGuiInset()
+                        local clickX = absPos.X + (absSize.X / 2)
+                        local clickY = absPos.Y + (absSize.Y / 2) + guiInset.Y
 
-                            -- Mouse Click Event
-                            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
-                            task.wait(0.02)
-                            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
+                        -- Mouse Click Event
+                        VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
+                        task.wait(0.02)
+                        VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
 
-                            -- Mobile Touch Event
-                            VirtualInputManager:SendTouchEvent(1, 0, clickX, clickY)
-                            task.wait(0.02)
-                            VirtualInputManager:SendTouchEvent(1, 2, clickX, clickY)
-                        end
+                        -- Mobile Touch Event
+                        VirtualInputManager:SendTouchEvent(1, 0, clickX, clickY)
+                        task.wait(0.02)
+                        VirtualInputManager:SendTouchEvent(1, 2, clickX, clickY)
                     end)
-
-                    logConsole(string.format("Anti Macro UI ditemukan ('%s') & berhasil diklik!", rawText))
-                    return true
                 end
+
+                logConsole(string.format("Anti Macro UI ditemukan ('%s') & berhasil diklik di koordinat X:%.0f Y:%.0f!", rawText, absPos.X + absSize.X/2, absPos.Y + absSize.Y/2))
+                return true
             end
         end
     end
@@ -1445,14 +1445,12 @@ task.spawn(function()
             pcall(function()
                 local clicked = clickAntiMacroUI()
                 
-                -- Jika tombol UI tidak bisa diklik langsung, cari token acak dari UI / Remote
                 if not clicked then
                     local events = LocalReplicatedStorage:FindFirstChild("Events")
                     local antiMacroFolder = events and events:FindFirstChild("AntiMacro")
                     local respondRemote = antiMacroFolder and antiMacroFolder:FindFirstChild("Respond")
                     
                     if respondRemote then
-                        -- Mengambil dynamic code/attribute yang tersimpan di GUI jika ada
                         local pGui = LocalPlayer:FindFirstChild("PlayerGui")
                         local dynamicCode = nil
                         
