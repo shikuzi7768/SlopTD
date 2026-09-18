@@ -60,6 +60,13 @@ local saveConfigToFile, loadConfigFromFile, loadMacroFromFile, playMacroQueue, u
 -- HELPER FUNCTIONS (ENHANCED TOWER LOOKUP)
 -- ==========================================
 
+local function isMatchActuallyStarted()
+    local functionsFolder = LocalReplicatedStorage:FindFirstChild("Functions")
+    local spawnRemote = functionsFolder and functionsFolder:FindFirstChild("SpawnTower")
+    local mapFolder = Workspace:FindFirstChild("Map") or Workspace:FindFirstChild("Board")
+    return (spawnRemote ~= nil and mapFolder ~= nil)
+end
+
 local function setGameSpeed(speed)
     local functionsFolder = LocalReplicatedStorage:FindFirstChild("Functions")
     local changeSpeedRemote = functionsFolder and functionsFolder:FindFirstChild("ChangeSpeed")
@@ -1362,20 +1369,29 @@ end)
 -- ==========================================
 
 local function isMatchFinished()
+    -- Pastikan match sudah benar-benar berjalan (board/map ada di Workspace)
+    if not isMatchActuallyStarted() then return false end
+
     local pGui = LocalPlayer:FindFirstChild("PlayerGui")
     if not pGui then return false end
     
     for _, gui in ipairs(pGui:GetChildren()) do
         if gui:IsA("ScreenGui") and gui.Enabled then
             local lowerName = string.lower(gui.Name)
-            if string.find(lowerName, "end") or string.find(lowerName, "victory") or string.find(lowerName, "defeat") or string.find(lowerName, "gameover") or string.find(lowerName, "reward") or string.find(lowerName, "result") then
-                return true
-            end
-            for _, desc in ipairs(gui:GetDescendants()) do
-                if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and desc.Visible then
-                    local txt = string.lower(desc.Text or "")
-                    if txt == "victory!" or txt == "victory" or txt == "defeat!" or txt == "defeat" or txt == "game over" then
-                        return true
+            
+            -- Abaikan seluruh UI yang berhubungan dengan Voting atau Lobby
+            if not string.find(lowerName, "vote") and not string.find(lowerName, "lobby") then
+                -- Hanya cari nama UI spesifik layar hasil pertandingan
+                if string.find(lowerName, "victory") or string.find(lowerName, "defeat") or string.find(lowerName, "gameover") then
+                    return true
+                end
+                
+                for _, desc in ipairs(gui:GetDescendants()) do
+                    if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and desc.Visible then
+                        local txt = string.lower(desc.Text or "")
+                        if txt == "victory!" or txt == "victory" or txt == "defeat!" or txt == "defeat" or txt == "game over" then
+                            return true
+                        end
                     end
                 end
             end
@@ -1500,13 +1516,6 @@ end)
 -- ==========================================
 -- AUTO PLAY & VOTE LOOP
 -- ==========================================
-
-local function isMatchActuallyStarted()
-    local functionsFolder = LocalReplicatedStorage:FindFirstChild("Functions")
-    local spawnRemote = functionsFolder and functionsFolder:FindFirstChild("SpawnTower")
-    local mapFolder = Workspace:FindFirstChild("Map") or Workspace:FindFirstChild("Board")
-    return (spawnRemote ~= nil and mapFolder ~= nil)
-end
 
 task.spawn(function()
     while true do
