@@ -1235,7 +1235,6 @@ AutoAbilityBtn.MouseButton1Click:Connect(function()
     isAutoAbilityEnabled = not isAutoAbilityEnabled
     AutoAbilityBtn.Text = isAutoAbilityEnabled and "Auto Ability: ON" or "Auto Ability: OFF"
     AutoAbilityBtn.BackgroundColor3 = isAutoAbilityEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
-    saveConfigToFile()
 end)
 
 AutoSkipBtn.MouseButton1Click:Connect(function()
@@ -1359,79 +1358,89 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO ANTI MACRO LOOP (UPDATED NO INSET OFFSET)
+-- AUTO ANTI MACRO LOOP (DYNAMIC SCANNER FIXED)
 -- ==========================================
 
 local function clickAntiMacroUI()
     local pGui = LocalPlayer:FindFirstChild("PlayerGui")
     if not pGui then return false end
 
+    local guiInset = GuiService:GetGuiInset()
+
     for _, element in ipairs(pGui:GetDescendants()) do
-        if element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("ImageButton") then
+        if element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("ImageButton") or element:IsA("TextBox") then
             local rawText = ""
-            if element:IsA("TextLabel") or element:IsA("TextButton") then
+            if element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("TextBox") then
                 rawText = element.Text or ""
             end
             
-            -- Bersihkan tag rich text dan ubah ke huruf kecil
-            local cleanText = rawText:gsub("<[^>]->", ""):lower()
-            local normalizedText = cleanText:gsub("[%p%s]", "") 
+            -- Pembersihan RichText dan normalisasi string
+            local cleanText = rawText:gsub("<[^>]->", ""):lower():gsub("[%p%s]", "")
 
-            -- Deteksi variasi teks "I'm here"
-            if normalizedText:find("imhere") or normalizedText:find("iamhere") or (normalizedText:find("here") and normalizedText:find("still")) then
-                local absPos = element.AbsolutePosition
-                local absSize = element.AbsoluteSize
+            -- Deteksi kata kunci anti-macro ("I'm here", "im here", "still there")
+            if cleanText:find("imhere") or cleanText:find("iamhere") or (cleanText:find("here") and cleanText:find("still")) then
                 
-                local targetButton = (element:IsA("TextButton") or element:IsA("ImageButton")) 
-                                     and element 
+                -- Cari elemen tombol GUI yang valid
+                local targetButton = (element:IsA("GuiButton") and element) 
+                                     or element:FindFirstAncestorWhichIsA("GuiButton") 
                                      or element:FindFirstAncestorOfClass("TextButton") 
                                      or element:FindFirstAncestorOfClass("ImageButton") 
-                                     or element
+                                     or element.Parent
 
-                local eventsToFire = {"MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "Activated", "TouchTap"}
-                local targetsToTrigger = {element, targetButton, element.Parent}
-
-                -- 1. Trigger event internal GUI secara langsung
-                for _, targetObj in ipairs(targetsToTrigger) do
-                    if targetObj and targetObj:IsA("GuiObject") then
-                        if firesignal then
-                            for _, eventName in ipairs(eventsToFire) do
-                                pcall(function() firesignal(targetObj[eventName]) end)
-                            end
+                if targetButton then
+                    -- 1. Engine Native Method (Direct Engine Call)
+                    pcall(function()
+                        if targetButton:IsA("GuiButton") then
+                            targetButton:Activate()
                         end
+                    end)
 
+                    -- 2. Trigger Event Internal Script Executor (firesignal & getconnections)
+                    local eventsToFire = {"Activated", "MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "TouchTap"}
+                    for _, eventName in ipairs(eventsToFire) do
+                        if firesignal then
+                            pcall(function() firesignal(targetButton[eventName]) end)
+                        end
                         if getconnections then
-                            for _, eventName in ipairs(eventsToFire) do
-                                pcall(function()
-                                    for _, conn in ipairs(getconnections(targetObj[eventName])) do
-                                        conn:Fire()
-                                    end
-                                end)
-                            end
+                            pcall(function()
+                                for _, conn in ipairs(getconnections(targetButton[eventName])) do
+                                    conn:Fire()
+                                end
+                            end)
                         end
                     end
+
+                    -- 3. Dynamic Virtual Input Simulation (PC & Mobile/Android)
+                    if targetButton:IsA("GuiObject") and targetButton.AbsoluteSize.X > 0 then
+                        pcall(function()
+                            local absPos = targetButton.AbsolutePosition
+                            local absSize = targetButton.AbsoluteSize
+                            
+                            -- Hitung titik tengah tombol dimanapun ia muncul
+                            local centerX = absPos.X + (absSize.X / 2)
+                            local centerY = absPos.Y + (absSize.Y / 2)
+
+                            -- Klik 1: Koordinat Asli Mouse
+                            VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+                            task.wait(0.02)
+                            VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+
+                            -- Klik 2: Tambahan Offset GuiInset (HP dengan Top-bar / Notch)
+                            local insetY = centerY + guiInset.Y
+                            VirtualInputManager:SendMouseButtonEvent(centerX, insetY, 0, true, game, 0)
+                            task.wait(0.02)
+                            VirtualInputManager:SendMouseButtonEvent(centerX, insetY, 0, false, game, 0)
+
+                            -- Klik 3: Touch Screen Simulation (Khusus Mobile Android)
+                            VirtualInputManager:SendTouchEvent(1, 0, centerX, centerY)
+                            task.wait(0.02)
+                            VirtualInputManager:SendTouchEvent(1, 2, centerX, centerY)
+                        end)
+                    end
+
+                    logConsole(string.format("Anti Macro UI berhasil diklik di lokasi dinamis! Teks: '%s'", rawText))
+                    return true
                 end
-
-                -- 2. Simulasi klik fisik presisi murni tanpa offset GuiInset
-                if absSize.X > 0 and absSize.Y > 0 then
-                    pcall(function()
-                        local clickX = absPos.X + (absSize.X / 2)
-                        local clickY = absPos.Y + (absSize.Y / 2)
-
-                        -- Input Mouse
-                        VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
-                        task.wait(0.03)
-                        VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
-
-                        -- Input Layar Sentuh Mobile
-                        VirtualInputManager:SendTouchEvent(1, 0, clickX, clickY)
-                        task.wait(0.03)
-                        VirtualInputManager:SendTouchEvent(1, 2, clickX, clickY)
-                    end)
-                end
-
-                logConsole(string.format("Anti Macro UI diklik presisi di X:%.0f Y:%.0f ('%s')", absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, rawText))
-                return true
             end
         end
     end
@@ -1445,6 +1454,7 @@ task.spawn(function()
             pcall(function()
                 local clicked = clickAntiMacroUI()
                 
+                -- Fallback: Jika UI tidak ditemukan via tombol, cari Remote Code jika game menggunakannya
                 if not clicked then
                     local events = LocalReplicatedStorage:FindFirstChild("Events")
                     local antiMacroFolder = events and events:FindFirstChild("AntiMacro")
