@@ -1359,7 +1359,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO ANTI MACRO LOOP (FIXED POSITION)
+-- AUTO ANTI MACRO LOOP (UPDATED NO INSET OFFSET)
 -- ==========================================
 
 local function clickAntiMacroUI()
@@ -1373,24 +1373,25 @@ local function clickAntiMacroUI()
                 rawText = element.Text or ""
             end
             
-            -- Clean rich text tags & lower case
+            -- Bersihkan tag rich text dan ubah ke huruf kecil
             local cleanText = rawText:gsub("<[^>]->", ""):lower()
             local normalizedText = cleanText:gsub("[%p%s]", "") 
 
-            -- Cek variasi teks "I'm here"
+            -- Deteksi variasi teks "I'm here"
             if normalizedText:find("imhere") or normalizedText:find("iamhere") or (normalizedText:find("here") and normalizedText:find("still")) then
-                -- UTAMAKAN KOORDINAT DARI ELEMEN TEKS ITU SENDIRI (TextLabel / TextButton)
-                -- AGAR TIDAK SALAH MEMILIH PARENT FRAME DI TENGAH LAYAR
                 local absPos = element.AbsolutePosition
                 local absSize = element.AbsoluteSize
                 
-                local ancestorButton = element:FindFirstAncestorOfClass("TextButton") 
-                                    or element:FindFirstAncestorOfClass("ImageButton")
+                local targetButton = (element:IsA("TextButton") or element:IsA("ImageButton")) 
+                                     and element 
+                                     or element:FindFirstAncestorOfClass("TextButton") 
+                                     or element:FindFirstAncestorOfClass("ImageButton") 
+                                     or element
 
                 local eventsToFire = {"MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "Activated", "TouchTap"}
-                local targetsToTrigger = {element, ancestorButton, element.Parent}
+                local targetsToTrigger = {element, targetButton, element.Parent}
 
-                -- 1. Trigger via firesignal & connections ke elemen teks & induknya
+                -- 1. Trigger event internal GUI secara langsung
                 for _, targetObj in ipairs(targetsToTrigger) do
                     if targetObj and targetObj:IsA("GuiObject") then
                         if firesignal then
@@ -1411,26 +1412,25 @@ local function clickAntiMacroUI()
                     end
                 end
 
-                -- 2. Simulasi Input Fisik Layar (Tepat di koordinat teks "I'm here")
+                -- 2. Simulasi klik fisik presisi murni tanpa offset GuiInset
                 if absSize.X > 0 and absSize.Y > 0 then
                     pcall(function()
-                        local guiInset = GuiService:GetGuiInset()
                         local clickX = absPos.X + (absSize.X / 2)
-                        local clickY = absPos.Y + (absSize.Y / 2) + guiInset.Y
+                        local clickY = absPos.Y + (absSize.Y / 2)
 
-                        -- Mouse Click Event
+                        -- Input Mouse
                         VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
-                        task.wait(0.02)
+                        task.wait(0.03)
                         VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
 
-                        -- Mobile Touch Event
+                        -- Input Layar Sentuh Mobile
                         VirtualInputManager:SendTouchEvent(1, 0, clickX, clickY)
-                        task.wait(0.02)
+                        task.wait(0.03)
                         VirtualInputManager:SendTouchEvent(1, 2, clickX, clickY)
                     end)
                 end
 
-                logConsole(string.format("Anti Macro UI ditemukan ('%s') & berhasil diklik di koordinat X:%.0f Y:%.0f!", rawText, absPos.X + absSize.X/2, absPos.Y + absSize.Y/2))
+                logConsole(string.format("Anti Macro UI diklik presisi di X:%.0f Y:%.0f ('%s')", absPos.X + absSize.X/2, absPos.Y + absSize.Y/2, rawText))
                 return true
             end
         end
