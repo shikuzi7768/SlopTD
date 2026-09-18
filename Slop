@@ -35,7 +35,7 @@ local autoCrateAmount = 0 -- 0 = OFF, 1 = 1x, 10 = 10x, 25 = 25x
 local autoBuyCrateAmount = 0 -- 0 = OFF, 1 = 1x, 3 = 3x, 10 = 10x
 local isAutoAbilityEnabled = false
 local isAutoVoteSkipEnabled = false
-local isAutoAntiMacroEnabled = false
+local isAutoReplayEnabled = false
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
@@ -451,17 +451,17 @@ AutoBuyCrateBtn.TextSize = 13
 AutoBuyCrateBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoBuyCrateBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Anti Macro Toggle Button
-local AutoAntiMacroBtn = Instance.new("TextButton")
-AutoAntiMacroBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoAntiMacroBtn.Position = UDim2.new(0.05, 0, 0, 520)
-AutoAntiMacroBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
-AutoAntiMacroBtn.Text = "Auto Anti Macro: OFF"
-AutoAntiMacroBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-AutoAntiMacroBtn.Font = Enum.Font.SourceSansBold
-AutoAntiMacroBtn.TextSize = 13
-AutoAntiMacroBtn.Parent = ContentFrame
-Instance.new("UICorner", AutoAntiMacroBtn).CornerRadius = UDim.new(0, 4)
+-- Auto Replay Toggle Button
+local AutoReplayBtn = Instance.new("TextButton")
+AutoReplayBtn.Size = UDim2.new(0.9, 0, 0, 30)
+AutoReplayBtn.Position = UDim2.new(0.05, 0, 0, 520)
+AutoReplayBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+AutoReplayBtn.Text = "Auto Replay Match: OFF"
+AutoReplayBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoReplayBtn.Font = Enum.Font.SourceSansBold
+AutoReplayBtn.TextSize = 13
+AutoReplayBtn.Parent = ContentFrame
+Instance.new("UICorner", AutoReplayBtn).CornerRadius = UDim.new(0, 4)
 
 -- Detailed Status Info Label
 local StatusLabel = Instance.new("TextLabel")
@@ -518,7 +518,7 @@ saveConfigToFile = function()
         autoBuyCrateAmount = autoBuyCrateAmount,
         autoAbility = isAutoAbilityEnabled,
         autoVoteSkip = isAutoVoteSkipEnabled,
-        autoAntiMacro = isAutoAntiMacroEnabled,
+        autoReplay = isAutoReplayEnabled,
         mapName = MapNameBox.Text,
         diffName = DiffNameBox.Text,
         crateName = CrateNameBox.Text,
@@ -608,10 +608,10 @@ loadConfigFromFile = function()
             AutoSkipBtn.BackgroundColor3 = isAutoVoteSkipEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
         end
         
-        if result.autoAntiMacro ~= nil then
-            isAutoAntiMacroEnabled = result.autoAntiMacro
-            AutoAntiMacroBtn.Text = isAutoAntiMacroEnabled and "Auto Anti Macro: ON" or "Auto Anti Macro: OFF"
-            AutoAntiMacroBtn.BackgroundColor3 = isAutoAntiMacroEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+        if result.autoReplay ~= nil then
+            isAutoReplayEnabled = result.autoReplay
+            AutoReplayBtn.Text = isAutoReplayEnabled and "Auto Replay Match: ON" or "Auto Replay Match: OFF"
+            AutoReplayBtn.BackgroundColor3 = isAutoReplayEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
         end
 
         if result.mapName then MapNameBox.Text = result.mapName end
@@ -1224,10 +1224,10 @@ AutoBuyCrateBtn.MouseButton1Click:Connect(function()
     saveConfigToFile()
 end)
 
-AutoAntiMacroBtn.MouseButton1Click:Connect(function()
-    isAutoAntiMacroEnabled = not isAutoAntiMacroEnabled
-    AutoAntiMacroBtn.Text = isAutoAntiMacroEnabled and "Auto Anti Macro: ON" or "Auto Anti Macro: OFF"
-    AutoAntiMacroBtn.BackgroundColor3 = isAutoAntiMacroEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+AutoReplayBtn.MouseButton1Click:Connect(function()
+    isAutoReplayEnabled = not isAutoReplayEnabled
+    AutoReplayBtn.Text = isAutoReplayEnabled and "Auto Replay Match: ON" or "Auto Replay Match: OFF"
+    AutoReplayBtn.BackgroundColor3 = isAutoReplayEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
     saveConfigToFile()
 end)
 
@@ -1358,95 +1358,25 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO ANTI MACRO LOOP (DYNAMIC SCANNER FIXED)
+-- AUTO REPLAY MATCH LOOP (RUNS ONLY ON MATCH END)
 -- ==========================================
 
-local function clickAntiMacroUI()
-    local containers = {}
+local function isMatchFinished()
+    local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pGui then return false end
     
-    -- 1. Cari di PlayerGui dan CoreGui/gethui
-    if LocalPlayer:FindFirstChild("PlayerGui") then
-        table.insert(containers, LocalPlayer.PlayerGui)
-    end
-    if gethui then
-        pcall(function() table.insert(containers, gethui()) end)
-    elseif game:GetService("CoreGui") then
-        pcall(function() table.insert(containers, game:GetService("CoreGui")) end)
-    end
-
-    local guiInset = GuiService:GetGuiInset()
-
-    for _, container in ipairs(containers) do
-        for _, element in ipairs(container:GetDescendants()) do
-            if element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("TextBox") then
-                local rawText = element.Text or ""
-                
-                -- Normalisasi teks: Hapus tag RichText, petik lurus ('), petik miring (’/`), dan spasi/simbol
-                local cleanText = rawText:gsub("<[^>]->", ""):lower()
-                cleanText = cleanText:gsub("’", ""):gsub("'", ""):gsub("`", ""):gsub("%s+", ""):gsub("[%p]", "")
-
-                -- Deteksi kata kunci "imhere", "iamhere", atau kombinasi "here"
-                if cleanText:find("imhere") or cleanText:find("iamhere") or cleanText == "here" or (cleanText:find("here") and cleanText:find("still")) then
-                    
-                    -- Cari elemen yang bisa diklik (Button atau Parent-nya jika berbentuk Frame/TextLabel)
-                    local targetObj = element
-                    if not (element:IsA("GuiButton")) then
-                        targetObj = element:FindFirstAncestorWhichIsA("GuiButton") 
-                                 or element:FindFirstAncestorOfClass("ImageButton")
-                                 or element:FindFirstAncestorOfClass("TextButton")
-                                 or element.Parent 
-                                 or element
+    for _, gui in ipairs(pGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled then
+            local lowerName = string.lower(gui.Name)
+            if string.find(lowerName, "end") or string.find(lowerName, "victory") or string.find(lowerName, "defeat") or string.find(lowerName, "gameover") or string.find(lowerName, "reward") or string.find(lowerName, "result") then
+                return true
+            end
+            for _, desc in ipairs(gui:GetDescendants()) do
+                if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and desc.Visible then
+                    local txt = string.lower(desc.Text or "")
+                    if txt == "victory!" or txt == "victory" or txt == "defeat!" or txt == "defeat" or txt == "game over" then
+                        return true
                     end
-
-                    -- A. Eksekusi Tombol (Activate & Event Connections)
-                    pcall(function()
-                        if targetObj:IsA("GuiButton") then
-                            targetObj:Activate()
-                        end
-                    end)
-
-                    local eventsToFire = {"Activated", "MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "TouchTap"}
-                    for _, eventName in ipairs(eventsToFire) do
-                        if firesignal and targetObj[eventName] then
-                            pcall(function() firesignal(targetObj[eventName]) end)
-                        end
-                        if getconnections and targetObj[eventName] then
-                            pcall(function()
-                                for _, conn in ipairs(getconnections(targetObj[eventName])) do
-                                    conn:Fire()
-                                end
-                            end)
-                        end
-                    end
-
-                    -- B. Simulasi Klik Fisik (Virtual Input Manager & Touch)
-                    if targetObj:IsA("GuiObject") and targetObj.AbsoluteSize.X > 0 then
-                        pcall(function()
-                            local absPos = targetObj.AbsolutePosition
-                            local absSize = targetObj.AbsoluteSize
-                            local centerX = absPos.X + (absSize.X / 2)
-                            local centerY = absPos.Y + (absSize.Y / 2)
-
-                            -- Klik posisi asli
-                            VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
-                            task.wait(0.02)
-                            VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
-
-                            -- Klik posisi offset GuiInset (Top-bar/Notch Layar HP)
-                            local insetY = centerY + guiInset.Y
-                            VirtualInputManager:SendMouseButtonEvent(centerX, insetY, 0, true, game, 0)
-                            task.wait(0.02)
-                            VirtualInputManager:SendMouseButtonEvent(centerX, insetY, 0, false, game, 0)
-
-                            -- Simulasi Layar Sentuh Android
-                            VirtualInputManager:SendTouchEvent(1, 0, centerX, centerY)
-                            task.wait(0.02)
-                            VirtualInputManager:SendTouchEvent(1, 2, centerX, centerY)
-                        end)
-                    end
-
-                    logConsole(string.format("Anti Macro UI berhasil diklik! Teks Asli: '%s'", rawText))
-                    return true
                 end
             end
         end
@@ -1456,41 +1386,22 @@ end
 
 task.spawn(function()
     while true do
-        task.wait(0.5)
-        if isAutoAntiMacroEnabled then
+        task.wait(2)
+        if isAutoReplayEnabled and isMatchFinished() then
             pcall(function()
-                local clicked = clickAntiMacroUI()
+                local events = LocalReplicatedStorage:FindFirstChild("Events") or LocalReplicatedStorage:FindFirstChild("Remotes") or LocalReplicatedStorage
+                local endDecisionRemote = events and events:FindFirstChild("EndDecision", true)
+                if not endDecisionRemote then
+                    endDecisionRemote = game:GetService("ReplicatedStorage"):FindFirstChild("Events") and game:GetService("ReplicatedStorage").Events:FindFirstChild("EndDecision")
+                end
                 
-                -- Fallback: Jika UI tidak ditemukan via tombol, cari Remote Code jika game menggunakannya
-                if not clicked then
-                    local events = LocalReplicatedStorage:FindFirstChild("Events")
-                    local antiMacroFolder = events and events:FindFirstChild("AntiMacro")
-                    local respondRemote = antiMacroFolder and antiMacroFolder:FindFirstChild("Respond")
-                    
-                    if respondRemote then
-                        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-                        local dynamicCode = nil
-                        
-                        if pGui then
-                            for _, obj in ipairs(pGui:GetDescendants()) do
-                                if obj:IsA("StringValue") and #obj.Value > 10 then
-                                    dynamicCode = obj.Value
-                                    break
-                                elseif obj:GetAttribute("Code") or obj:GetAttribute("Token") then
-                                    dynamicCode = obj:GetAttribute("Code") or obj:GetAttribute("Token")
-                                    break
-                                end
-                            end
-                        end
-                        
-                        if dynamicCode then
-                            if respondRemote:IsA("RemoteEvent") then
-                                respondRemote:FireServer(dynamicCode)
-                            elseif respondRemote:IsA("RemoteFunction") then
-                                respondRemote:InvokeServer(dynamicCode)
-                            end
-                        end
+                if endDecisionRemote then
+                    if endDecisionRemote:IsA("RemoteEvent") then
+                        endDecisionRemote:FireServer(true)
+                    elseif endDecisionRemote:IsA("RemoteFunction") then
+                        endDecisionRemote:InvokeServer(true)
                     end
+                    logConsole("Auto Replay Match dieksekusi!")
                 end
             end)
         end
