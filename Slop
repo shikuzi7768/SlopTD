@@ -1,4 +1,4 @@
-Local LocalReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
@@ -58,13 +58,6 @@ local saveConfigToFile, loadConfigFromFile, loadMacroFromFile, playMacroQueue, u
 -- ==========================================
 -- HELPER FUNCTIONS (ENHANCED TOWER LOOKUP)
 -- ==========================================
-
-local function isMatchActuallyStarted()
-    local functionsFolder = LocalReplicatedStorage:FindFirstChild("Functions")
-    local spawnRemote = functionsFolder and functionsFolder:FindFirstChild("SpawnTower")
-    local mapFolder = Workspace:FindFirstChild("Map") or Workspace:FindFirstChild("Board")
-    return (spawnRemote ~= nil and mapFolder ~= nil)
-end
 
 local function setGameSpeed(speed)
     local functionsFolder = LocalReplicatedStorage:FindFirstChild("Functions")
@@ -150,7 +143,7 @@ end
 ScreenGui.Parent = playerGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 680)
+MainFrame.Size = UDim2.new(0, 240, 0, 685)
 MainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
@@ -480,7 +473,7 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         ContentFrame.Visible = false
         MinimizeBtn.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 240, 0, 680)
+        MainFrame.Size = UDim2.new(0, 240, 0, 685)
         ContentFrame.Visible = true
         MinimizeBtn.Text = "-"
     end
@@ -1215,6 +1208,7 @@ AutoAbilityBtn.MouseButton1Click:Connect(function()
     isAutoAbilityEnabled = not isAutoAbilityEnabled
     AutoAbilityBtn.Text = isAutoAbilityEnabled and "Auto Ability: ON" or "Auto Ability: OFF"
     AutoAbilityBtn.BackgroundColor3 = isAutoAbilityEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
 end)
 
 AutoSkipBtn.MouseButton1Click:Connect(function()
@@ -1429,6 +1423,13 @@ end)
 -- ==========================================
 -- AUTO PLAY & VOTE LOOP
 -- ==========================================
+
+local function isMatchActuallyStarted()
+    local functionsFolder = LocalReplicatedStorage:FindFirstChild("Functions")
+    local spawnRemote = functionsFolder and functionsFolder:FindFirstChild("SpawnTower")
+    local mapFolder = Workspace:FindFirstChild("Map") or Workspace:FindFirstChild("Board")
+    return (spawnRemote ~= nil and mapFolder ~= nil)
+end
 
 task.spawn(function()
     while true do
