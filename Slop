@@ -27,6 +27,7 @@ local recordStartTime = 0
 local selectedMacroFile = ""
 
 local isAutoPlaySingleEnabled = false
+local isAutoReplayEnabled = false
 local currentSpeedMultiplier = 1
 
 local autoSummonAmount = 0 -- 0 = OFF, 10 = 10x, 50 = 50x
@@ -38,6 +39,7 @@ local isAutoVoteSkipEnabled = false
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
+local hasReplayedThisSession = false
 
 -- Auto Vote Variables
 local isAutoVoteEnabled = false
@@ -143,7 +145,7 @@ end
 ScreenGui.Parent = playerGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 685)
+MainFrame.Size = UDim2.new(0, 240, 0, 715)
 MainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
@@ -450,10 +452,22 @@ AutoBuyCrateBtn.TextSize = 13
 AutoBuyCrateBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoBuyCrateBtn).CornerRadius = UDim.new(0, 4)
 
+-- Auto Replay Toggle Button
+local AutoReplayBtn = Instance.new("TextButton")
+AutoReplayBtn.Size = UDim2.new(0.9, 0, 0, 30)
+AutoReplayBtn.Position = UDim2.new(0.05, 0, 0, 520)
+AutoReplayBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+AutoReplayBtn.Text = "Auto Replay: OFF"
+AutoReplayBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AutoReplayBtn.Font = Enum.Font.SourceSansBold
+AutoReplayBtn.TextSize = 13
+AutoReplayBtn.Parent = ContentFrame
+Instance.new("UICorner", AutoReplayBtn).CornerRadius = UDim.new(0, 4)
+
 -- Detailed Status Info Label
 local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(0.9, 0, 0, 140)
-StatusLabel.Position = UDim2.new(0.05, 0, 0, 520)
+StatusLabel.Size = UDim2.new(0.9, 0, 0, 130)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 555)
 StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 StatusLabel.Text = "Status: Ready\nSilahkan pilih Macro atau mulai Recording."
 StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
@@ -473,7 +487,7 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         ContentFrame.Visible = false
         MinimizeBtn.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 240, 0, 685)
+        MainFrame.Size = UDim2.new(0, 240, 0, 715)
         ContentFrame.Visible = true
         MinimizeBtn.Text = "-"
     end
@@ -496,6 +510,7 @@ saveConfigToFile = function()
     if not supportsFileSystem then return end
     local configData = {
         autoPlaySingle = isAutoPlaySingleEnabled,
+        autoReplay = isAutoReplayEnabled,
         autoVote = isAutoVoteEnabled,
         autoVoteDiff = isAutoVoteDiffEnabled,
         speedMultiplier = currentSpeedMultiplier,
@@ -524,6 +539,12 @@ loadConfigFromFile = function()
         if result.autoPlaySingle ~= nil then isAutoPlaySingleEnabled = result.autoPlaySingle end
         updateAutoPlayUI()
         
+        if result.autoReplay ~= nil then
+            isAutoReplayEnabled = result.autoReplay
+            AutoReplayBtn.Text = isAutoReplayEnabled and "Auto Replay: ON" or "Auto Replay: OFF"
+            AutoReplayBtn.BackgroundColor3 = isAutoReplayEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+        end
+
         if result.autoVote ~= nil then
             isAutoVoteEnabled = result.autoVote
             AutoVoteBtn.Text = isAutoVoteEnabled and "Vote ON" or "Vote OFF"
@@ -1114,6 +1135,13 @@ AutoSingleBtn.MouseButton1Click:Connect(function()
     saveConfigToFile()
 end)
 
+AutoReplayBtn.MouseButton1Click:Connect(function()
+    isAutoReplayEnabled = not isAutoReplayEnabled
+    AutoReplayBtn.Text = isAutoReplayEnabled and "Auto Replay: ON" or "Auto Replay: OFF"
+    AutoReplayBtn.BackgroundColor3 = isAutoReplayEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
+end)
+
 SpeedBtn.MouseButton1Click:Connect(function()
     if currentSpeedMultiplier == 1 then currentSpeedMultiplier = 2
     elseif currentSpeedMultiplier == 2 then currentSpeedMultiplier = 3
@@ -1421,7 +1449,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO PLAY & VOTE LOOP
+-- AUTO PLAY, VOTE & AUTO REPLAY LOOP
 -- ==========================================
 
 local function isMatchActuallyStarted()
@@ -1431,10 +1459,69 @@ local function isMatchActuallyStarted()
     return (spawnRemote ~= nil and mapFolder ~= nil)
 end
 
+local function isMatchFinished()
+    for _, gui in ipairs(playerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and gui.Enabled then
+            for _, desc in ipairs(gui:GetDescendants()) do
+                if desc:IsA("TextLabel") and desc.Visible then
+                    local text = string.lower(desc.Text)
+                    if string.find(text, "victory") or string.find(text, "defeat") or string.find(text, "game over") then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function triggerReplayRemote()
+    pcall(function()
+        local replayBtnRemote = LocalReplicatedStorage:FindFirstChild("ReplayButtonPressed")
+        if replayBtnRemote then
+            if replayBtnRemote:IsA("RemoteEvent") then
+                replayBtnRemote:FireServer()
+            elseif replayBtnRemote:IsA("RemoteFunction") then
+                replayBtnRemote:InvokeServer()
+            end
+            logConsole("Auto Replay dikirim via ReplayButtonPressed")
+        end
+        
+        local eventsFolder = LocalReplicatedStorage:FindFirstChild("Events")
+        local endDecisionRemote = eventsFolder and eventsFolder:FindFirstChild("EndDecision")
+        if endDecisionRemote then
+            if endDecisionRemote:IsA("RemoteEvent") then
+                endDecisionRemote:FireServer(true)
+            elseif endDecisionRemote:IsA("RemoteFunction") then
+                endDecisionRemote:InvokeServer(true)
+            end
+            logConsole("Auto Replay dikirim via Events.EndDecision")
+        end
+    end)
+end
+
 task.spawn(function()
     while true do
         task.wait(1)
         
+        if isMatchFinished() then
+            if isAutoReplayEnabled and not hasReplayedThisSession then
+                hasReplayedThisSession = true
+                isPlaying = false
+                
+                -- Countdown 14 Detik
+                for i = 14, 1, -1 do
+                    StatusLabel.Text = string.format("Status: Match Finished!\nAuto Replay Buffer: %d s", i)
+                    task.wait(1)
+                end
+                
+                StatusLabel.Text = "Status: Executing Auto Replay..."
+                triggerReplayRemote()
+            end
+        else
+            hasReplayedThisSession = false
+        end
+
         if (isAutoVoteEnabled or isAutoVoteDiffEnabled) and not hasVotedThisSession then
             hasVotedThisSession = true
             task.spawn(function()
