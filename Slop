@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
+local GuiService = game:GetService("GuiService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
@@ -36,7 +37,9 @@ local autoSummonAmount, autoPremSummonAmount, autoCrateAmount, autoBuyCrateAmoun
 local isAutoAbilityEnabled, isAutoVoteSkipEnabled = false, false
 
 local isAutoReplayEnabled, isAutoLobbyEnabled, hasExecutedEndDecision = false, false, false
-local hasAutoPlayedThisSession, isAutoVoteEnabled, isAutoVoteDiffEnabled, hasVotedThisSession, isVotingPhase = false, false, false, false, false
+local hasAutoPlayedThisSession, isAutoVoteEnabled, isAutoVoteDiffEnabled = false, false, false
+local hasVotedInCurrentLobby = false
+local isVotingPhase = false
 
 local placedTowersRecord, placedTowersPlay = {}, {}
 
@@ -1005,7 +1008,7 @@ loadConfigFromFile()
 local function clickGuiObject(guiObject)
     if not guiObject then return end
     
-    -- 1. Pemicu Signal
+    -- 1. Pemicu Event UI Roblox Direct
     if firesignal then
         pcall(function() firesignal(guiObject.MouseButton1Click) end)
         pcall(function() firesignal(guiObject.Activated) end)
@@ -1013,13 +1016,14 @@ local function clickGuiObject(guiObject)
         pcall(function() firesignal(guiObject.MouseButton1Up) end)
     end
     
-    -- 2. Simulasi Klik Layar Fisik (Sangat Ampuh di Delta Mobile)
+    -- 2. Simulasi Klik Layar Presisi (Mendukung Delta Mobile tanpa offset salah)
     pcall(function()
         if guiObject.AbsolutePosition and guiObject.AbsoluteSize then
-            local centerPos = guiObject.AbsolutePosition + (guiObject.AbsoluteSize / 2)
-            VirtualInputManager:SendMouseButtonEvent(centerPos.X, centerPos.Y + 36, 0, true, game, 0)
+            local inset = GuiService:GetGuiInset()
+            local centerPos = guiObject.AbsolutePosition + (guiObject.AbsoluteSize / 2) + inset
+            VirtualInputManager:SendMouseButtonEvent(centerPos.X, centerPos.Y, 0, true, game, 0)
             task.wait(0.05)
-            VirtualInputManager:SendMouseButtonEvent(centerPos.X, centerPos.Y + 36, 0, false, game, 0)
+            VirtualInputManager:SendMouseButtonEvent(centerPos.X, centerPos.Y, 0, false, game, 0)
         end
     end)
 end
@@ -1050,7 +1054,7 @@ local function isMatchEnded()
         if (v:IsA("TextLabel") or v:IsA("TextButton")) and v.Visible then
             local textLower = string.lower(v.Text)
             if string.find(textLower, "victory") or string.find(textLower, "defeat") 
-               or string.find(textLower, "game over") or string.find(textLower, "replay") then
+               or string.find(textLower, "game over") or string.find(textLower, "retry") then
                 return true
             end
         end
@@ -1062,7 +1066,7 @@ local function triggerEndDecision(isReplay)
     local pGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
     local foundAndClicked = false
 
-    -- 1. Sasar Tombol UI secara Pintar (Mencari Teks Turunan di dalam TextLabel Child)
+    -- 1. Scan UI Button
     if pGui then
         for _, btn in ipairs(pGui:GetDescendants()) do
             if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible and btn.AbsoluteSize.X > 0 then
@@ -1090,7 +1094,7 @@ local function triggerEndDecision(isReplay)
         end
     end
 
-    -- 2. Fallback scan Remote jika tombol UI gagal dipicu
+    -- 2. Direct Remote Fallback
     pcall(function()
         local eventsFolder = LocalReplicatedStorage:FindFirstChild("Events") or LocalReplicatedStorage:FindFirstChild("Remotes") or LocalReplicatedStorage
         if not eventsFolder then return end
@@ -1129,14 +1133,13 @@ task.spawn(function()
                 hasExecutedEndDecision = true
                 task.wait(0.5)
                 
-                -- Mencoba klik berulang 3 kali dengan interval tipis agar pasti terkeset
-                for i = 1, 3 do
+                for i = 1, 4 do
                     if isAutoReplayEnabled then
                         triggerEndDecision(true)
-                        StatusLabel.Text = string.format("Status: Victory/Defeat!\nAuto Replay Executed (%d)...", i)
+                        StatusLabel.Text = string.format("Status: Match Selesai!\nExecuting Auto Replay (%d)...", i)
                     elseif isAutoLobbyEnabled then
                         triggerEndDecision(false)
-                        StatusLabel.Text = string.format("Status: Victory/Defeat!\nAuto Lobby Executed (%d)...", i)
+                        StatusLabel.Text = string.format("Status: Match Selesai!\nExecuting Auto Lobby (%d)...", i)
                     end
                     task.wait(0.8)
                 end
@@ -1203,20 +1206,21 @@ task.spawn(function()
     while true do
         task.wait(1)
         
-        if (isAutoVoteEnabled or isAutoVoteDiffEnabled) and not hasVotedThisSession then
-            hasVotedThisSession = true
+        -- Logic Vote (Hanya dieksekusi 1X per sesi lobby)
+        if (isAutoVoteEnabled or isAutoVoteDiffEnabled) and not hasVotedInCurrentLobby and not isMatchActuallyStarted() then
+            hasVotedInCurrentLobby = true
             task.spawn(function()
                 isVotingPhase = true
                 
                 if isAutoVoteEnabled then
                     local cleanMapText = MapNameBox.Text:match("^%s*(.-)%s*$") or ""
-                    local mapVal = tonumber(cleanMapText) or cleanMapText -- Otomatis ubah ke angka jika diisi slot 1, 2, dll
+                    local mapVal = tonumber(cleanMapText) or cleanMapText
                     
                     local voteMapRemote = getEventRemote({"VoteForMap", "VoteMap", "MapVote", "Vote"})
                     if voteMapRemote then 
                         pcall(function() voteMapRemote:FireServer(mapVal) end) 
                     end
-                    task.wait(3)
+                    task.wait(2)
                 end
                 
                 if isAutoVoteDiffEnabled then
@@ -1227,15 +1231,17 @@ task.spawn(function()
                     if voteDiffRemote then 
                         pcall(function() voteDiffRemote:FireServer(diffVal) end) 
                     end
-                    task.wait(2)
+                    task.wait(1)
                 end
                 
                 isVotingPhase = false
             end)
         end
         
+        -- Reset Flag Vote & Playback Control saat Game Dimulai
         if isMatchActuallyStarted() then
             setGameSpeed(currentSpeedMultiplier)
+            
             if isAutoPlaySingleEnabled and not isPlaying and not isRecording and not hasAutoPlayedThisSession then
                 hasAutoPlayedThisSession = true
                 for i = 10, 1, -1 do
@@ -1251,7 +1257,10 @@ task.spawn(function()
             end
         else
             hasAutoPlayedThisSession = false
-            hasVotedThisSession = false
+            -- Mengizinkan vote ulang jika pemain kembali ke lobby
+            if not isVotingPhase then
+                hasVotedInCurrentLobby = false
+            end
         end
     end
 end)
