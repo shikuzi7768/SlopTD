@@ -1005,7 +1005,7 @@ end)
 loadConfigFromFile()
 
 -- ==========================================
--- OPTIMIZED END GAME MATCH DETECTOR (RINGAN)
+-- OPTIMIZED END GAME MATCH DETECTOR & TRIGGER
 -- ==========================================
 
 local function isMatchActuallyStarted()
@@ -1021,18 +1021,76 @@ local function isMatchEnded()
     local pGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
     if not pGui then return false end
     
-    -- Cek nama ScreenGui secara eksplisit tanpa scan GetDescendants (jauh lebih cepat)
-    for _, gui in ipairs(pGui:GetChildren()) do
-        if gui:IsA("ScreenGui") and gui.Enabled then
-            local gName = string.lower(gui.Name)
-            if string.find(gName, "victory") or string.find(gName, "defeat") 
-               or string.find(gName, "gameover") or string.find(gName, "result") 
-               or string.find(gName, "end") or string.find(gName, "win") then
+    -- Cek secara mendalam teks atau Frame bertema Victory/Defeat/Game Over
+    for _, v in ipairs(pGui:GetDescendants()) do
+        if (v:IsA("Frame") or v:IsA("ImageLabel") or v:IsA("CanvasGroup")) and v.Visible then
+            local nameLower = string.lower(v.Name)
+            if string.find(nameLower, "victory") or string.find(nameLower, "defeat") 
+               or string.find(nameLower, "gameover") or string.find(nameLower, "resultframe") 
+               or string.find(nameLower, "endscreen") then
+                return true
+            end
+        end
+        
+        if (v:IsA("TextLabel") or v:IsA("TextButton")) and v.Visible then
+            local textLower = string.lower(v.Text)
+            if string.find(textLower, "victory") or string.find(textLower, "defeat") 
+               or string.find(textLower, "game over") or string.find(textLower, "replay") then
                 return true
             end
         end
     end
     return false
+end
+
+local function triggerEndDecision(isReplay)
+    local pGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    local foundAndClicked = false
+
+    -- 1. Cari & Klik Tombol Replay/Lobby di UI secara otomatis (Sama seperti menekan manual)
+    if pGui then
+        for _, btn in ipairs(pGui:GetDescendants()) do
+            if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
+                local nameLower = string.lower(btn.Name)
+                local textLower = btn:IsA("TextButton") and string.lower(btn.Text) or ""
+                
+                local targetTerm = isReplay and "replay" or "lobby"
+                local altTerm = isReplay and "retry" or "quit"
+                
+                if string.find(nameLower, targetTerm) or string.find(nameLower, altTerm) or 
+                   string.find(textLower, targetTerm) or string.find(textLower, altTerm) then
+                    
+                    if firesignal then
+                        pcall(function() firesignal(btn.MouseButton1Click) end)
+                        pcall(function() firesignal(btn.Activated) end)
+                    end
+                    foundAndClicked = true
+                end
+            end
+        end
+    end
+
+    -- 2. Fallback ke Remote Server jika klik UI gagal
+    pcall(function()
+        local eventsFolder = LocalReplicatedStorage:FindFirstChild("Events") or LocalReplicatedStorage:FindFirstChild("Remotes") or LocalReplicatedStorage
+        if not eventsFolder then return end
+        
+        local endDecisionRemote = eventsFolder:FindFirstChild("EndDecision", true) 
+                               or eventsFolder:FindFirstChild("Replay", true) 
+                               or eventsFolder:FindFirstChild("Restart", true)
+        
+        if endDecisionRemote then
+            if endDecisionRemote:IsA("RemoteEvent") then
+                endDecisionRemote:FireServer(isReplay and true or false)
+                endDecisionRemote:FireServer(isReplay and "Replay" or "Lobby")
+            elseif endDecisionRemote:IsA("RemoteFunction") then
+                endDecisionRemote:InvokeServer(isReplay and true or false)
+                endDecisionRemote:InvokeServer(isReplay and "Replay" or "Lobby")
+            end
+        end
+    end)
+
+    return foundAndClicked
 end
 
 -- ==========================================
@@ -1041,27 +1099,20 @@ end
 
 task.spawn(function()
     while true do
-        task.wait(1.5)
+        task.wait(1)
         
         if not isVotingPhase and (isAutoReplayEnabled or isAutoLobbyEnabled) then
             if isMatchEnded() and not hasExecutedEndDecision then
                 hasExecutedEndDecision = true
                 task.wait(1)
                 
-                pcall(function()
-                    local eventsFolder = LocalReplicatedStorage:FindFirstChild("Events") or LocalReplicatedStorage:FindFirstChild("Remotes") or LocalReplicatedStorage
-                    local endDecisionRemote = eventsFolder and eventsFolder:FindFirstChild("EndDecision", true)
-                    
-                    if endDecisionRemote then
-                        if isAutoReplayEnabled then
-                            endDecisionRemote:FireServer(true)
-                            StatusLabel.Text = "Status: Victory/Defeat!\nAuto Replay Sent!"
-                        elseif isAutoLobbyEnabled then
-                            endDecisionRemote:FireServer(false)
-                            StatusLabel.Text = "Status: Victory/Defeat!\nAuto Lobby Sent!"
-                        end
-                    end
-                end)
+                if isAutoReplayEnabled then
+                    triggerEndDecision(true)
+                    StatusLabel.Text = "Status: Victory/Defeat!\nAuto Replay Executed!"
+                elseif isAutoLobbyEnabled then
+                    triggerEndDecision(false)
+                    StatusLabel.Text = "Status: Victory/Defeat!\nAuto Lobby Executed!"
+                end
             end
         end
         
