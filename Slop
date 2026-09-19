@@ -506,6 +506,11 @@ updateAutoPlayUI = function()
     AutoSingleBtn.BackgroundColor3 = isAutoPlaySingleEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
 end
 
+local function updateAutoReplayUI()
+    AutoReplayBtn.Text = isAutoReplayEnabled and "Auto Replay: ON" or "Auto Replay: OFF"
+    AutoReplayBtn.BackgroundColor3 = isAutoReplayEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+end
+
 saveConfigToFile = function()
     if not supportsFileSystem then return end
     local configData = {
@@ -541,8 +546,7 @@ loadConfigFromFile = function()
         
         if result.autoReplay ~= nil then
             isAutoReplayEnabled = result.autoReplay
-            AutoReplayBtn.Text = isAutoReplayEnabled and "Auto Replay: ON" or "Auto Replay: OFF"
-            AutoReplayBtn.BackgroundColor3 = isAutoReplayEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+            updateAutoReplayUI()
         end
 
         if result.autoVote ~= nil then
@@ -1135,10 +1139,10 @@ AutoSingleBtn.MouseButton1Click:Connect(function()
     saveConfigToFile()
 end)
 
+-- Toggle Auto Replay ON / OFF
 AutoReplayBtn.MouseButton1Click:Connect(function()
     isAutoReplayEnabled = not isAutoReplayEnabled
-    AutoReplayBtn.Text = isAutoReplayEnabled and "Auto Replay: ON" or "Auto Replay: OFF"
-    AutoReplayBtn.BackgroundColor3 = isAutoReplayEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    updateAutoReplayUI()
     saveConfigToFile()
 end)
 
@@ -1509,14 +1513,23 @@ task.spawn(function()
                 hasReplayedThisSession = true
                 isPlaying = false
                 
-                -- Countdown 14 Detik
+                -- Countdown 14 Detik dengan verifikasi ON/OFF setiap detik
+                local replayCancelled = false
                 for i = 14, 1, -1 do
+                    if not isAutoReplayEnabled then
+                        replayCancelled = true
+                        StatusLabel.Text = "Status: Auto Replay Disabled (OFF)"
+                        logConsole("Auto Replay dibatalkan karena tombol diklik OFF.")
+                        break
+                    end
                     StatusLabel.Text = string.format("Status: Match Finished!\nAuto Replay Buffer: %d s", i)
                     task.wait(1)
                 end
                 
-                StatusLabel.Text = "Status: Executing Auto Replay..."
-                triggerReplayRemote()
+                if not replayCancelled and isAutoReplayEnabled then
+                    StatusLabel.Text = "Status: Executing Auto Replay..."
+                    triggerReplayRemote()
+                end
             end
         else
             hasReplayedThisSession = false
