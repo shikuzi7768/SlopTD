@@ -1,4 +1,4 @@
-local LocalReplicatedStorage = game:GetService("ReplicatedStorage")
+Local LocalReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
@@ -143,7 +143,7 @@ end
 ScreenGui.Parent = playerGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 685)
+MainFrame.Size = UDim2.new(0, 240, 0, 30) -- Ubah ke tinggi 30 agar auto minimize saat execute
 MainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
@@ -183,7 +183,7 @@ local MinimizeBtn = Instance.new("TextButton")
 MinimizeBtn.Size = UDim2.new(0, 24, 0, 24)
 MinimizeBtn.Position = UDim2.new(1, -52, 0, 3)
 MinimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-MinimizeBtn.Text = "-"
+MinimizeBtn.Text = "+" -- Ubah teks awal menjadi "+"
 MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 MinimizeBtn.Font = Enum.Font.SourceSansBold
 MinimizeBtn.TextSize = 16
@@ -207,6 +207,7 @@ local ContentFrame = Instance.new("Frame")
 ContentFrame.Size = UDim2.new(1, 0, 1, -30)
 ContentFrame.Position = UDim2.new(0, 0, 0, 30)
 ContentFrame.BackgroundTransparency = 1
+ContentFrame.Visible = false -- Sembunyikan konten awal
 ContentFrame.Parent = MainFrame
 
 -- Record Button
@@ -465,7 +466,7 @@ StatusLabel.Parent = ContentFrame
 Instance.new("UICorner", StatusLabel).CornerRadius = UDim.new(0, 4)
 
 -- UI Events
-local isMinimized = false
+local isMinimized = true -- Set status awal ke true
 MinimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
