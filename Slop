@@ -1,25 +1,55 @@
+-- ==========================================
+-- SAFE EXECUTOR INITIALIZATION
+-- ==========================================
 local LocalReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local CoreGui = game:GetService("CoreGui")
 
--- Check Executor File System Support
-local supportsFileSystem = (writefile and readfile and isfolder and makefolder and listfiles and delfile and isfile)
-if not supportsFileSystem then
-    warn("[Macro System]: Executor kamu tidak mendukung File System lengkap!")
+local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then
+    Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+    LocalPlayer = Players.LocalPlayer
 end
 
+-- Safely detect Parent Container for Executor
+local function getGuiParent()
+    if gethui then
+        local success, result = pcall(gethui)
+        if success and result then return result end
+    end
+    
+    local successCore, coreGui = pcall(function() return CoreGui end)
+    if successCore and coreGui then
+        return coreGui
+    end
+    
+    return LocalPlayer:WaitForChild("PlayerGui", 10)
+end
+
+local parentContainer = getGuiParent()
+if not parentContainer then
+    warn("[Macro System]: Gagal menemukan lokasi GUI!")
+    return
+end
+
+-- Remove Existing UI
+if parentContainer:FindFirstChild("TowerMacroUI_Advanced") then
+    parentContainer.TowerMacroUI_Advanced:Destroy()
+end
+
+-- File System Support Check
+local supportsFileSystem = (writefile and readfile and isfolder and makefolder and listfiles and delfile and isfile)
 local FOLDER_NAME = "TowerMacroData"
 local CONFIG_FILE = FOLDER_NAME .. "/config.json"
 
 if supportsFileSystem and not isfolder(FOLDER_NAME) then
-    makefolder(FOLDER_NAME)
+    pcall(makefolder, FOLDER_NAME)
 end
 
--- System Variables
+-- Variable Declarations
 local recordedActions = {}
 local isRecording = false
 local isPlaying = false
@@ -48,36 +78,19 @@ local function logConsole(msg)
     print(string.format("[Macro System]: %s", tostring(msg)))
 end
 
-local saveConfigToFile, loadConfigFromFile, loadMacroFromFile, playMacroQueue, updateAutoPlayUI
-
--- ==========================================
--- SAFE PARENTING (GUI ENHANCEMENT)
--- ==========================================
-
-local TargetParent
-if gethui then
-    TargetParent = gethui()
-elseif game:GetService("CoreGui"):FindFirstChild("RobloxGui") then
-    TargetParent = game:GetService("CoreGui")
-else
-    TargetParent = LocalPlayer:WaitForChild("PlayerGui")
-end
-
-if TargetParent:FindFirstChild("TowerMacroUI_Advanced") then
-    TargetParent.TowerMacroUI_Advanced:Destroy()
-end
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TowerMacroUI_Advanced"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = TargetParent
-
 -- ==========================================
 -- UI CREATION (MINIMIZED BY DEFAULT)
 -- ==========================================
 
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TowerMacroUI_Advanced"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 99999999
+ScreenGui.Enabled = true
+ScreenGui.Parent = parentContainer
+
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 30) -- Ukuran terlipat
+MainFrame.Size = UDim2.new(0, 240, 0, 30) -- Terlipat saat awal
 MainFrame.Position = UDim2.new(0.02, 0, 0.15, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
@@ -90,7 +103,7 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
--- Top Bar Frame
+-- Top Bar
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 30)
 TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
@@ -136,7 +149,7 @@ CloseBtn.TextSize = 13
 CloseBtn.Parent = TopBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
 
--- Container
+-- Main Content Container
 local ContentFrame = Instance.new("Frame")
 ContentFrame.Size = UDim2.new(1, 0, 1, -30)
 ContentFrame.Position = UDim2.new(0, 0, 0, 30)
@@ -192,7 +205,7 @@ SaveBtn.TextSize = 14
 SaveBtn.Parent = ContentFrame
 Instance.new("UICorner", SaveBtn).CornerRadius = UDim.new(0, 4)
 
--- Selected Macro Label
+-- Selected Label
 local SelectLabel = Instance.new("TextLabel")
 SelectLabel.Size = UDim2.new(0.9, 0, 0, 25)
 SelectLabel.Position = UDim2.new(0.05, 0, 0, 110)
@@ -216,7 +229,7 @@ RefreshBtn.TextSize = 12
 RefreshBtn.Parent = ContentFrame
 Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0, 4)
 
--- Delete Macro Button
+-- Delete Button
 local DeleteBtn = Instance.new("TextButton")
 DeleteBtn.Size = UDim2.new(0.43, 0, 0, 25)
 DeleteBtn.Position = UDim2.new(0.52, 0, 0, 140)
@@ -228,7 +241,7 @@ DeleteBtn.TextSize = 12
 DeleteBtn.Parent = ContentFrame
 Instance.new("UICorner", DeleteBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Play Toggle Button
+-- Auto Play Button
 local AutoSingleBtn = Instance.new("TextButton")
 AutoSingleBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoSingleBtn.Position = UDim2.new(0.05, 0, 0, 170)
@@ -240,7 +253,7 @@ AutoSingleBtn.TextSize = 13
 AutoSingleBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoSingleBtn).CornerRadius = UDim.new(0, 4)
 
--- Speed Multiplier Toggle Button
+-- Speed Button
 local SpeedBtn = Instance.new("TextButton")
 SpeedBtn.Size = UDim2.new(0.9, 0, 0, 30)
 SpeedBtn.Position = UDim2.new(0.05, 0, 0, 205)
@@ -252,7 +265,7 @@ SpeedBtn.TextSize = 13
 SpeedBtn.Parent = ContentFrame
 Instance.new("UICorner", SpeedBtn).CornerRadius = UDim.new(0, 4)
 
--- Map Input Box
+-- Map Input
 local MapNameBox = Instance.new("TextBox")
 MapNameBox.Size = UDim2.new(0.6, 0, 0, 30)
 MapNameBox.Position = UDim2.new(0.05, 0, 0, 240)
@@ -264,7 +277,7 @@ MapNameBox.TextSize = 13
 MapNameBox.Parent = ContentFrame
 Instance.new("UICorner", MapNameBox).CornerRadius = UDim.new(0, 4)
 
--- Auto Vote Map Toggle Button
+-- Auto Vote Map
 local AutoVoteBtn = Instance.new("TextButton")
 AutoVoteBtn.Size = UDim2.new(0.28, 0, 0, 30)
 AutoVoteBtn.Position = UDim2.new(0.67, 0, 0, 240)
@@ -276,7 +289,7 @@ AutoVoteBtn.TextSize = 11
 AutoVoteBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoVoteBtn).CornerRadius = UDim.new(0, 4)
 
--- Difficulty Input Box
+-- Difficulty Input
 local DiffNameBox = Instance.new("TextBox")
 DiffNameBox.Size = UDim2.new(0.6, 0, 0, 30)
 DiffNameBox.Position = UDim2.new(0.05, 0, 0, 275)
@@ -288,7 +301,7 @@ DiffNameBox.TextSize = 13
 DiffNameBox.Parent = ContentFrame
 Instance.new("UICorner", DiffNameBox).CornerRadius = UDim.new(0, 4)
 
--- Auto Vote Difficulty Toggle Button
+-- Auto Vote Difficulty
 local AutoVoteDiffBtn = Instance.new("TextButton")
 AutoVoteDiffBtn.Size = UDim2.new(0.28, 0, 0, 30)
 AutoVoteDiffBtn.Position = UDim2.new(0.67, 0, 0, 275)
@@ -300,7 +313,7 @@ AutoVoteDiffBtn.TextSize = 11
 AutoVoteDiffBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoVoteDiffBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Summon Toggle Button
+-- Auto Summon Button
 local AutoSummonBtn = Instance.new("TextButton")
 AutoSummonBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoSummonBtn.Position = UDim2.new(0.05, 0, 0, 310)
@@ -312,7 +325,7 @@ AutoSummonBtn.TextSize = 13
 AutoSummonBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoSummonBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Ability Toggle Button
+-- Auto Ability Button
 local AutoAbilityBtn = Instance.new("TextButton")
 AutoAbilityBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoAbilityBtn.Position = UDim2.new(0.05, 0, 0, 345)
@@ -324,7 +337,7 @@ AutoAbilityBtn.TextSize = 13
 AutoAbilityBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoAbilityBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Vote Skip Toggle Button
+-- Auto Skip Wave Button
 local AutoSkipBtn = Instance.new("TextButton")
 AutoSkipBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoSkipBtn.Position = UDim2.new(0.05, 0, 0, 380)
@@ -336,20 +349,19 @@ AutoSkipBtn.TextSize = 13
 AutoSkipBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoSkipBtn).CornerRadius = UDim.new(0, 4)
 
--- Crate Name Input Box
+-- Crate Input
 local CrateNameBox = Instance.new("TextBox")
 CrateNameBox.Size = UDim2.new(0.6, 0, 0, 30)
 CrateNameBox.Position = UDim2.new(0.05, 0, 0, 415)
 CrateNameBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 CrateNameBox.Text = "Space Crate"
-CrateNameBox.PlaceholderText = "Nama Crate"
 CrateNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 CrateNameBox.Font = Enum.Font.SourceSans
 CrateNameBox.TextSize = 12
 CrateNameBox.Parent = ContentFrame
 Instance.new("UICorner", CrateNameBox).CornerRadius = UDim.new(0, 4)
 
--- Auto Open Crate Toggle Button
+-- Auto Open Crate
 local AutoCrateBtn = Instance.new("TextButton")
 AutoCrateBtn.Size = UDim2.new(0.28, 0, 0, 30)
 AutoCrateBtn.Position = UDim2.new(0.67, 0, 0, 415)
@@ -361,7 +373,7 @@ AutoCrateBtn.TextSize = 11
 AutoCrateBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoCrateBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Premium Summon Toggle Button
+-- Auto Premium Summon
 local AutoPremSummonBtn = Instance.new("TextButton")
 AutoPremSummonBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoPremSummonBtn.Position = UDim2.new(0.05, 0, 0, 450)
@@ -373,7 +385,7 @@ AutoPremSummonBtn.TextSize = 13
 AutoPremSummonBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoPremSummonBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Buy Crate Toggle Button
+-- Auto Buy Crate
 local AutoBuyCrateBtn = Instance.new("TextButton")
 AutoBuyCrateBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoBuyCrateBtn.Position = UDim2.new(0.05, 0, 0, 485)
@@ -399,7 +411,7 @@ StatusLabel.TextYAlignment = Enum.TextYAlignment.Top
 StatusLabel.Parent = ContentFrame
 Instance.new("UICorner", StatusLabel).CornerRadius = UDim.new(0, 4)
 
--- UI Toggle Logic
+-- Toggle Minimize UI
 local isMinimized = true
 MinimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
@@ -418,4 +430,217 @@ CloseBtn.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
 
-print("[Macro System]: UI Berhasil dimuat dalam kondisi minimized di layar kiri atas!")
+-- ==========================================
+-- HELPER & CORE FUNCTIONS
+-- ==========================================
+
+local function setGameSpeed(speed)
+    local functionsFolder = LocalReplicatedStorage:FindFirstChild("Functions")
+    local changeSpeedRemote = functionsFolder and functionsFolder:FindFirstChild("ChangeSpeed")
+    if changeSpeedRemote then
+        pcall(function() changeSpeedRemote:InvokeServer(speed) end)
+    end
+end
+
+local function findTowerByPosition(targetCFrame, maxDist, ignoreTable)
+    if not targetCFrame then return nil end
+    local towersFolder = Workspace:FindFirstChild("Towers") or Workspace
+    maxDist = maxDist or 6
+    ignoreTable = ignoreTable or {}
+    
+    local closestTower = nil
+    local shortestDistance = maxDist
+    
+    for _, tower in ipairs(towersFolder:GetChildren()) do
+        if tower:IsA("Model") then
+            local isIgnored = false
+            for _, ignoredTower in pairs(ignoreTable) do
+                if ignoredTower == tower then
+                    isIgnored = true
+                    break
+                end
+            end
+            
+            if not isIgnored then
+                local primaryPart = tower.PrimaryPart or tower:FindFirstChild("HumanoidRootPart") or tower:FindFirstChildWhichIsA("BasePart")
+                if primaryPart then
+                    local dist = (primaryPart.Position - targetCFrame.Position).Magnitude
+                    if dist < shortestDistance then
+                        shortestDistance = dist
+                        closestTower = tower
+                    end
+                end
+            end
+        end
+    end
+    return closestTower
+end
+
+local function getEventRemote(nameList)
+    local events = LocalReplicatedStorage:FindFirstChild("Events") or LocalReplicatedStorage:FindFirstChild("Remotes") or LocalReplicatedStorage
+    if not events then return nil end
+    for _, name in ipairs(nameList) do
+        local remote = events:FindFirstChild(name, true)
+        if remote then return remote end
+    end
+    return nil
+end
+
+-- Config & File Handlers
+local function saveConfigToFile()
+    if not supportsFileSystem then return end
+    local configData = {
+        autoPlaySingle = isAutoPlaySingleEnabled,
+        autoVote = isAutoVoteEnabled,
+        autoVoteDiff = isAutoVoteDiffEnabled,
+        speedMultiplier = currentSpeedMultiplier,
+        autoSummonAmount = autoSummonAmount,
+        autoPremSummonAmount = autoPremSummonAmount,
+        autoCrateAmount = autoCrateAmount,
+        autoBuyCrateAmount = autoBuyCrateAmount,
+        autoAbility = isAutoAbilityEnabled,
+        autoVoteSkip = isAutoVoteSkipEnabled,
+        mapName = MapNameBox.Text,
+        diffName = DiffNameBox.Text,
+        crateName = CrateNameBox.Text,
+        selectedMacro = selectedMacroFile,
+        saveInputText = SaveNameBox.Text
+    }
+    pcall(writefile, CONFIG_FILE, HttpService:JSONEncode(configData))
+end
+
+local function loadMacroFromFile(fileName)
+    if not supportsFileSystem then return false end
+    local path = FOLDER_NAME .. "/" .. fileName .. ".json"
+    if not isfile(path) then return false end
+    
+    local success, rawJson = pcall(readfile, path)
+    if not success then return false end
+    
+    local decoded = HttpService:JSONDecode(rawJson)
+    recordedActions = {}
+    for _, action in ipairs(decoded) do
+        local restoredAction = {
+            actionType = action.actionType,
+            time = action.time,
+            towerIndex = action.towerIndex,
+            towerName = action.towerName,
+            arg3 = action.arg3,
+            arg4 = action.arg4,
+            arg5 = action.arg5,
+            extraArgs = action.extraArgs
+        }
+        if action.cframe then
+            restoredAction.cframe = CFrame.new(unpack(action.cframe))
+        end
+        table.insert(recordedActions, restoredAction)
+    end
+    
+    SelectLabel.Text = "Selected: " .. fileName
+    selectedMacroFile = fileName
+    StatusLabel.Text = string.format("Status: Loaded Macro\nFile: %s\nTotal Aksi: %d", fileName, #recordedActions)
+    return true
+end
+
+-- ==========================================
+-- BUTTON CONNECTIONS
+-- ==========================================
+
+RecordBtn.MouseButton1Click:Connect(function()
+    if isPlaying then return end
+    if not isRecording then
+        isRecording = true
+        recordedActions = {}
+        placedTowersRecord = {}
+        recordStartTime = tick()
+        RecordBtn.Text = "Recording... (Stop)"
+        RecordBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        StatusLabel.Text = "Status: Recording Started...\nPasang unit pertama kamu!"
+    else
+        isRecording = false
+        RecordBtn.Text = "Record"
+        RecordBtn.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+        StatusLabel.Text = string.format("Status: Recording Finished!\nTotal Aksi: %d", #recordedActions)
+    end
+end)
+
+SaveBtn.MouseButton1Click:Connect(function()
+    if SaveNameBox.Text ~= "" and #recordedActions > 0 and supportsFileSystem then
+        local serializedData = {}
+        for _, action in ipairs(recordedActions) do
+            local copyAction = {
+                actionType = action.actionType,
+                time = action.time,
+                towerIndex = action.towerIndex,
+                towerName = action.towerName,
+                arg3 = action.arg3, arg4 = action.arg4, arg5 = action.arg5,
+                extraArgs = action.extraArgs
+            }
+            if action.cframe then
+                copyAction.cframe = {action.cframe:GetComponents()}
+            end
+            table.insert(serializedData, copyAction)
+        end
+        
+        local path = FOLDER_NAME .. "/" .. SaveNameBox.Text .. ".json"
+        pcall(writefile, path, HttpService:JSONEncode(serializedData))
+        selectedMacroFile = SaveNameBox.Text
+        SelectLabel.Text = "Selected: " .. selectedMacroFile
+        StatusLabel.Text = string.format("Status: Saved!\nFile: %s.json", selectedMacroFile)
+        saveConfigToFile()
+    end
+end)
+
+AutoSingleBtn.MouseButton1Click:Connect(function()
+    isAutoPlaySingleEnabled = not isAutoPlaySingleEnabled
+    AutoSingleBtn.Text = isAutoPlaySingleEnabled and "Auto Play: ON" or "Auto Play: OFF"
+    AutoSingleBtn.BackgroundColor3 = isAutoPlaySingleEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
+end)
+
+SpeedBtn.MouseButton1Click:Connect(function()
+    currentSpeedMultiplier = (currentSpeedMultiplier % 5) + 1
+    SpeedBtn.Text = "Speed: " .. currentSpeedMultiplier .. "x"
+    SpeedBtn.BackgroundColor3 = (currentSpeedMultiplier > 1) and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    setGameSpeed(currentSpeedMultiplier)
+    saveConfigToFile()
+end)
+
+AutoVoteBtn.MouseButton1Click:Connect(function()
+    isAutoVoteEnabled = not isAutoVoteEnabled
+    AutoVoteBtn.Text = isAutoVoteEnabled and "Vote ON" or "Vote OFF"
+    AutoVoteBtn.BackgroundColor3 = isAutoVoteEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
+end)
+
+AutoVoteDiffBtn.MouseButton1Click:Connect(function()
+    isAutoVoteDiffEnabled = not isAutoVoteDiffEnabled
+    AutoVoteDiffBtn.Text = isAutoVoteDiffEnabled and "Diff ON" or "Diff OFF"
+    AutoVoteDiffBtn.BackgroundColor3 = isAutoVoteDiffEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
+end)
+
+AutoSummonBtn.MouseButton1Click:Connect(function()
+    if autoSummonAmount == 0 then autoSummonAmount = 10
+    elseif autoSummonAmount == 10 then autoSummonAmount = 50
+    else autoSummonAmount = 0 end
+    AutoSummonBtn.Text = autoSummonAmount > 0 and string.format("Auto Summon (%dx): ON", autoSummonAmount) or "Auto Summon: OFF"
+    AutoSummonBtn.BackgroundColor3 = autoSummonAmount > 0 and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
+end)
+
+AutoAbilityBtn.MouseButton1Click:Connect(function()
+    isAutoAbilityEnabled = not isAutoAbilityEnabled
+    AutoAbilityBtn.Text = isAutoAbilityEnabled and "Auto Ability: ON" or "Auto Ability: OFF"
+    AutoAbilityBtn.BackgroundColor3 = isAutoAbilityEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
+end)
+
+AutoSkipBtn.MouseButton1Click:Connect(function()
+    isAutoVoteSkipEnabled = not isAutoVoteSkipEnabled
+    AutoSkipBtn.Text = isAutoVoteSkipEnabled and "Auto Skip Wave: ON" or "Auto Skip Wave: OFF"
+    AutoSkipBtn.BackgroundColor3 = isAutoVoteSkipEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    saveConfigToFile()
+end)
+
+logConsole("Macro UI berhasil dimuat di layar!")
