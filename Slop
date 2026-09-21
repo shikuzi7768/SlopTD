@@ -1,4 +1,4 @@
-local LocalReplicatedStorage = game:GetService("ReplicatedStorage")
+Local LocalReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
@@ -38,10 +38,6 @@ local isAutoVoteSkipEnabled = false
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
-
--- Auto Vote Variables
-local isAutoVoteDiffEnabled = false
-local hasVotedThisSession = false
 
 -- System Tracking
 local placedTowersRecord = {}
@@ -142,7 +138,7 @@ end
 ScreenGui.Parent = playerGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 650)
+MainFrame.Size = UDim2.new(0, 240, 0, 615)
 MainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
@@ -316,34 +312,10 @@ SpeedBtn.TextSize = 13
 SpeedBtn.Parent = ContentFrame
 Instance.new("UICorner", SpeedBtn).CornerRadius = UDim.new(0, 4)
 
--- Difficulty Input Box
-local DiffNameBox = Instance.new("TextBox")
-DiffNameBox.Size = UDim2.new(0.6, 0, 0, 30)
-DiffNameBox.Position = UDim2.new(0.05, 0, 0, 240)
-DiffNameBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-DiffNameBox.Text = "Nightmare"
-DiffNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-DiffNameBox.Font = Enum.Font.SourceSans
-DiffNameBox.TextSize = 13
-DiffNameBox.Parent = ContentFrame
-Instance.new("UICorner", DiffNameBox).CornerRadius = UDim.new(0, 4)
-
--- Auto Vote Difficulty Toggle Button
-local AutoVoteDiffBtn = Instance.new("TextButton")
-AutoVoteDiffBtn.Size = UDim2.new(0.28, 0, 0, 30)
-AutoVoteDiffBtn.Position = UDim2.new(0.67, 0, 0, 240)
-AutoVoteDiffBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
-AutoVoteDiffBtn.Text = "Diff ON"
-AutoVoteDiffBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-AutoVoteDiffBtn.Font = Enum.Font.SourceSansBold
-AutoVoteDiffBtn.TextSize = 11
-AutoVoteDiffBtn.Parent = ContentFrame
-Instance.new("UICorner", AutoVoteDiffBtn).CornerRadius = UDim.new(0, 4)
-
 -- Auto Summon Toggle Button
 local AutoSummonBtn = Instance.new("TextButton")
 AutoSummonBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoSummonBtn.Position = UDim2.new(0.05, 0, 0, 275)
+AutoSummonBtn.Position = UDim2.new(0.05, 0, 0, 240)
 AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoSummonBtn.Text = "Auto Summon: OFF"
 AutoSummonBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -355,7 +327,7 @@ Instance.new("UICorner", AutoSummonBtn).CornerRadius = UDim.new(0, 4)
 -- Auto Ability Toggle Button
 local AutoAbilityBtn = Instance.new("TextButton")
 AutoAbilityBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoAbilityBtn.Position = UDim2.new(0.05, 0, 0, 310)
+AutoAbilityBtn.Position = UDim2.new(0.05, 0, 0, 275)
 AutoAbilityBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoAbilityBtn.Text = "Auto Ability: OFF"
 AutoAbilityBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -367,7 +339,7 @@ Instance.new("UICorner", AutoAbilityBtn).CornerRadius = UDim.new(0, 4)
 -- Auto Vote Skip Toggle Button
 local AutoSkipBtn = Instance.new("TextButton")
 AutoSkipBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoSkipBtn.Position = UDim2.new(0.05, 0, 0, 345)
+AutoSkipBtn.Position = UDim2.new(0.05, 0, 0, 310)
 AutoSkipBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoSkipBtn.Text = "Auto Skip Wave: OFF"
 AutoSkipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -379,7 +351,7 @@ Instance.new("UICorner", AutoSkipBtn).CornerRadius = UDim.new(0, 4)
 -- Crate Name Input Box
 local CrateNameBox = Instance.new("TextBox")
 CrateNameBox.Size = UDim2.new(0.6, 0, 0, 30)
-CrateNameBox.Position = UDim2.new(0.05, 0, 0, 380)
+CrateNameBox.Position = UDim2.new(0.05, 0, 0, 345)
 CrateNameBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 CrateNameBox.Text = "Space Crate"
 CrateNameBox.PlaceholderText = "Nama Crate"
@@ -392,7 +364,7 @@ Instance.new("UICorner", CrateNameBox).CornerRadius = UDim.new(0, 4)
 -- Auto Open Crate Toggle Button
 local AutoCrateBtn = Instance.new("TextButton")
 AutoCrateBtn.Size = UDim2.new(0.28, 0, 0, 30)
-AutoCrateBtn.Position = UDim2.new(0.67, 0, 0, 380)
+AutoCrateBtn.Position = UDim2.new(0.67, 0, 0, 345)
 AutoCrateBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoCrateBtn.Text = "Crate: OFF"
 AutoCrateBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -404,7 +376,7 @@ Instance.new("UICorner", AutoCrateBtn).CornerRadius = UDim.new(0, 4)
 -- Auto Premium Summon Toggle Button
 local AutoPremSummonBtn = Instance.new("TextButton")
 AutoPremSummonBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoPremSummonBtn.Position = UDim2.new(0.05, 0, 0, 415)
+AutoPremSummonBtn.Position = UDim2.new(0.05, 0, 0, 380)
 AutoPremSummonBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoPremSummonBtn.Text = "Auto Prem Summon: OFF"
 AutoPremSummonBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -416,7 +388,7 @@ Instance.new("UICorner", AutoPremSummonBtn).CornerRadius = UDim.new(0, 4)
 -- Auto Buy Crate Toggle Button
 local AutoBuyCrateBtn = Instance.new("TextButton")
 AutoBuyCrateBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoBuyCrateBtn.Position = UDim2.new(0.05, 0, 0, 450)
+AutoBuyCrateBtn.Position = UDim2.new(0.05, 0, 0, 415)
 AutoBuyCrateBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoBuyCrateBtn.Text = "Auto Buy Crate: OFF"
 AutoBuyCrateBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -428,7 +400,7 @@ Instance.new("UICorner", AutoBuyCrateBtn).CornerRadius = UDim.new(0, 4)
 -- Detailed Status Info Label
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 140)
-StatusLabel.Position = UDim2.new(0.05, 0, 0, 485)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 450)
 StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 StatusLabel.Text = "Status: Ready\nSilahkan pilih Macro atau mulai Recording."
 StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
@@ -448,7 +420,7 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         ContentFrame.Visible = false
         MinimizeBtn.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 240, 0, 650)
+        MainFrame.Size = UDim2.new(0, 240, 0, 615)
         ContentFrame.Visible = true
         MinimizeBtn.Text = "-"
     end
@@ -471,7 +443,6 @@ saveConfigToFile = function()
     if not supportsFileSystem then return end
     local configData = {
         autoPlaySingle = isAutoPlaySingleEnabled,
-        autoVoteDiff = isAutoVoteDiffEnabled,
         speedMultiplier = currentSpeedMultiplier,
         autoSummonAmount = autoSummonAmount,
         autoPremSummonAmount = autoPremSummonAmount,
@@ -479,7 +450,6 @@ saveConfigToFile = function()
         autoBuyCrateAmount = autoBuyCrateAmount,
         autoAbility = isAutoAbilityEnabled,
         autoVoteSkip = isAutoVoteSkipEnabled,
-        diffName = DiffNameBox.Text,
         crateName = CrateNameBox.Text,
         selectedMacro = selectedMacroFile,
         saveInputText = SaveNameBox.Text
@@ -496,12 +466,6 @@ loadConfigFromFile = function()
     if success and typeof(result) == "table" then
         if result.autoPlaySingle ~= nil then isAutoPlaySingleEnabled = result.autoPlaySingle end
         updateAutoPlayUI()
-        
-        if result.autoVoteDiff ~= nil then
-            isAutoVoteDiffEnabled = result.autoVoteDiff
-            AutoVoteDiffBtn.Text = isAutoVoteDiffEnabled and "Diff ON" or "Diff OFF"
-            AutoVoteDiffBtn.BackgroundColor3 = isAutoVoteDiffEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
-        end
         
         if result.speedMultiplier ~= nil then
             currentSpeedMultiplier = result.speedMultiplier
@@ -561,7 +525,6 @@ loadConfigFromFile = function()
             AutoSkipBtn.BackgroundColor3 = isAutoVoteSkipEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
         end
 
-        if result.diffName then DiffNameBox.Text = result.diffName end
         if result.crateName then CrateNameBox.Text = result.crateName end
         if result.saveInputText then SaveNameBox.Text = result.saveInputText end
         
@@ -1093,13 +1056,6 @@ SpeedBtn.MouseButton1Click:Connect(function()
     saveConfigToFile()
 end)
 
-AutoVoteDiffBtn.MouseButton1Click:Connect(function()
-    isAutoVoteDiffEnabled = not isAutoVoteDiffEnabled
-    AutoVoteDiffBtn.Text = isAutoVoteDiffEnabled and "Diff ON" or "Diff OFF"
-    AutoVoteDiffBtn.BackgroundColor3 = isAutoVoteDiffEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
-    saveConfigToFile()
-end)
-
 AutoSummonBtn.MouseButton1Click:Connect(function()
     if autoSummonAmount == 0 then autoSummonAmount = 10
     elseif autoSummonAmount == 10 then autoSummonAmount = 50
@@ -1337,7 +1293,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO PLAY & VOTE LOOP
+-- AUTO PLAY LOOP
 -- ==========================================
 
 local function isMatchActuallyStarted()
@@ -1351,30 +1307,14 @@ task.spawn(function()
     while true do
         task.wait(1)
         
-        if isAutoVoteDiffEnabled and not hasVotedThisSession then
-            hasVotedThisSession = true
-            task.spawn(function()
-                local voteDiffRemote = getEventRemote({"VoteForComplication", "VoteComplication"})
-                if voteDiffRemote then
-                    for attempt = 1, 5 do
-                        pcall(function()
-                            voteDiffRemote:FireServer(DiffNameBox.Text)
-                        end)
-                        logConsole(string.format("Auto Vote Difficulty (%d/5) dikirim: %s", attempt, DiffNameBox.Text))
-                        task.wait(1)
-                    end
-                end
-            end)
-        end
-        
         if isMatchActuallyStarted() then
             setGameSpeed(currentSpeedMultiplier)
             if isAutoPlaySingleEnabled and not isPlaying and not isRecording and not hasAutoPlayedThisSession then
                 hasAutoPlayedThisSession = true
-                for i = 5, 1, -1 do
-                    StatusLabel.Text = string.format("Status: Match Detected!\nWaiting Spawn Buffer: %d s", i)
-                    task.wait(1)
-                end
+                
+                -- Waktu tunggu buffer awal spawn diubah menjadi 1 detik
+                StatusLabel.Text = "Status: Match Detected!\nWaiting Spawn Buffer: 1 s"
+                task.wait(1)
                 
                 if selectedMacroFile ~= "" then
                     playMacroQueue(selectedMacroFile)
@@ -1386,7 +1326,6 @@ task.spawn(function()
             end
         else
             hasAutoPlayedThisSession = false
-            hasVotedThisSession = false
         end
     end
 end)
