@@ -1,4 +1,4 @@
-Local LocalReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
@@ -111,25 +111,30 @@ local function getPlacedTowersPlayList(excludeIndex)
 end
 
 -- ==========================================
--- UI CREATION
+-- UI CREATION (SAFE CONTAINER)
 -- ==========================================
+
+local targetParent = nil
+if gethui then
+    targetParent = gethui()
+elseif game:GetService("CoreGui"):FindFirstChild("RobloxGui") then
+    targetParent = game:GetService("CoreGui")
+else
+    targetParent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+if targetParent:FindFirstChild("TowerMacroUI_Advanced") then
+    targetParent.TowerMacroUI_Advanced:Destroy()
+end
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TowerMacroUI_Advanced"
 ScreenGui.ResetOnSpawn = false
-
-local playerGui = LocalPlayer:WaitForChild("PlayerGui", 5)
-if not playerGui then return end
-
-if playerGui:FindFirstChild("TowerMacroUI_Advanced") then
-    playerGui.TowerMacroUI_Advanced:Destroy()
-end
-
-ScreenGui.Parent = playerGui
+ScreenGui.Parent = targetParent
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 240, 0, 615)
-MainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
+MainFrame.Position = UDim2.new(0.02, 0, 0.15, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -1321,13 +1326,13 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- SAFE AUTO MINIMIZE ON STARTUP
+-- AUTO MINIMIZE ON STARTUP
 -- ==========================================
 task.defer(function()
-    task.wait(0.5)
+    task.wait(0.3)
     isMinimized = true
     MainFrame.Size = UDim2.new(0, 240, 0, 30)
     ContentFrame.Visible = false
     MinimizeBtn.Text = "+"
-    logConsole("[UI]: Auto-minimize berhasil diaktifkan secara aman.")
+    logConsole("[UI]: Auto-minimize aktif pada startup.")
 end)
