@@ -100,16 +100,6 @@ local function findTowerByPosition(targetCFrame, maxDist, ignoreTable)
     return closestTower
 end
 
-local function getEventRemote(nameList)
-    local events = LocalReplicatedStorage:FindFirstChild("Events") or LocalReplicatedStorage:FindFirstChild("Remotes") or LocalReplicatedStorage
-    if not events then return nil end
-    for _, name in ipairs(nameList) do
-        local remote = events:FindFirstChild(name, true)
-        if remote then return remote end
-    end
-    return nil
-end
-
 local function getPlacedTowersPlayList(excludeIndex)
     local ignoreList = {}
     for idx, towerModel in pairs(placedTowersPlay) do
@@ -1311,10 +1301,10 @@ task.spawn(function()
             setGameSpeed(currentSpeedMultiplier)
             if isAutoPlaySingleEnabled and not isPlaying and not isRecording and not hasAutoPlayedThisSession then
                 hasAutoPlayedThisSession = true
-                
-                -- Waktu tunggu buffer awal spawn diubah menjadi 1 detik
-                StatusLabel.Text = "Status: Match Detected!\nWaiting Spawn Buffer: 1 s"
-                task.wait(1)
+                for i = 2, 1, -1 do
+                    StatusLabel.Text = string.format("Status: Match Detected!\nWaiting Spawn Buffer: %d s", i)
+                    task.wait(1)
+                end
                 
                 if selectedMacroFile ~= "" then
                     playMacroQueue(selectedMacroFile)
