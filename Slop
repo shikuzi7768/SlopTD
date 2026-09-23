@@ -371,8 +371,8 @@ local MutatorNameBox = Instance.new("TextBox")
 MutatorNameBox.Size = UDim2.new(0.6, 0, 0, 30)
 MutatorNameBox.Position = UDim2.new(0.05, 0, 0, 310)
 MutatorNameBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-MutatorNameBox.Text = "Gigantism"
-MutatorNameBox.PlaceholderText = "Mutator / Slot (1-4)"
+MutatorNameBox.Text = "ArmoredSlop"
+MutatorNameBox.PlaceholderText = "Nama Mutator (Contoh: ArmoredSlop)"
 MutatorNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 MutatorNameBox.Font = Enum.Font.SourceSans
 MutatorNameBox.TextSize = 12
@@ -1259,7 +1259,7 @@ end)
 AutoSkipBtn.MouseButton1Click:Connect(function()
     isAutoVoteSkipEnabled = not isAutoVoteSkipEnabled
     AutoSkipBtn.Text = isAutoVoteSkipEnabled and "Auto Skip Wave: ON" or "Auto Skip Wave: OFF"
-    AutoSkipBtn.BackgroundColor3 = isAutoVoteSkipEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    AutoSkipBtn.BackgroundColor3 = isAutoSkipBtn.Text and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
     saveConfigToFile()
 end)
 
@@ -1420,41 +1420,27 @@ local function executeMapVote()
 end
 
 -- ==========================================
--- SMART AUTO VOTE MUTATOR FUNCTION
+-- PRECISE AUTO VOTE MUTATOR FUNCTION
 -- ==========================================
 
 local function executeMutatorVote()
-    local mutatorRemote = getEventRemote({"SlopMutator", "VoteMutator", "MutatorVote", "SlopMutators"})
+    local eventsFolder = LocalReplicatedStorage:FindFirstChild("Events")
+    local mutatorRemote = eventsFolder and eventsFolder:FindFirstChild("SlopMutator")
+    
     if not mutatorRemote then
-        logConsole("[MUTATOR ERROR] Remote SlopMutator tidak ditemukan!")
+        logConsole("[MUTATOR ERROR] Remote SlopMutator tidak ditemukan di ReplicatedStorage.Events!")
         return
     end
 
     local inputName = MutatorNameBox.Text
-    local numInput = tonumber(inputName)
+    if inputName == "" then return end
 
     for attempt = 1, 5 do
         pcall(function()
-            if mutatorRemote:IsA("RemoteEvent") then
-                if numInput then
-                    mutatorRemote:FireServer(numInput)
-                    mutatorRemote:FireServer("Vote", numInput)
-                else
-                    mutatorRemote:FireServer(inputName)
-                    mutatorRemote:FireServer("Vote", inputName)
-                    mutatorRemote:FireServer(1) -- Fallback jika nama tidak terdeteksi
-                end
-            elseif mutatorRemote:IsA("RemoteFunction") then
-                if numInput then
-                    mutatorRemote:InvokeServer(numInput)
-                else
-                    mutatorRemote:InvokeServer(inputName)
-                    mutatorRemote:InvokeServer("Vote", inputName)
-                end
-            end
+            mutatorRemote:FireServer("Vote", inputName)
         end)
-        logConsole(string.format("Auto Vote Mutator (%d/5) dikirim untuk: %s", attempt, inputName))
-        task.wait(0.8)
+        logConsole(string.format("Auto Vote Mutator (%d/5) dikirim: FireServer('Vote', '%s')", attempt, inputName))
+        task.wait(0.5)
     end
 end
 
