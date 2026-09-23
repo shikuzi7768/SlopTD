@@ -29,21 +29,22 @@ local selectedMacroFile = ""
 local isAutoPlaySingleEnabled = false
 local currentSpeedMultiplier = 1
 
-local autoSummonAmount = 0 -- 0 = OFF, 10 = 10x, 50 = 50x
-local autoPremSummonAmount = 0 -- 0 = OFF, 1 = 1x, 10 = 10x, 50 = 50x
-local autoCrateAmount = 0 -- 0 = OFF, 1 = 1x, 10 = 10x, 25 = 25x
-local autoBuyCrateAmount = 0 -- 0 = OFF, 1 = 1x, 3 = 3x, 10 = 10x
+local autoSummonAmount = 0
+local autoPremSummonAmount = 0
+local autoCrateAmount = 0
+local autoBuyCrateAmount = 0
 local isAutoAbilityEnabled = false
 local isAutoVoteSkipEnabled = false
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
+local hasVotedThisSession = false
+local wasInMatch = false
 
 -- Auto Vote Variables
 local isAutoVoteEnabled = false
 local isAutoVoteDiffEnabled = false
 local isAutoVoteMutatorEnabled = false
-local hasVotedThisSession = false
 
 -- System Tracking
 local placedTowersRecord = {}
@@ -57,7 +58,7 @@ end
 local saveConfigToFile, loadConfigFromFile, loadMacroFromFile, playMacroQueue, updateAutoPlayUI
 
 -- ==========================================
--- HELPER FUNCTIONS (ENHANCED TOWER LOOKUP)
+-- HELPER FUNCTIONS & UNIVERSAL REMOTE FINDER
 -- ==========================================
 
 local function setGameSpeed(speed)
@@ -67,6 +68,34 @@ local function setGameSpeed(speed)
         pcall(function()
             changeSpeedRemote:InvokeServer(speed)
         end)
+    end
+end
+
+-- Fungsi Pencari Remote Universal (Mendukung Events, Functions, & Remotes)
+local function getAnyRemote(nameList)
+    local locations = {
+        LocalReplicatedStorage:FindFirstChild("Events"),
+        LocalReplicatedStorage:FindFirstChild("Functions"),
+        LocalReplicatedStorage:FindFirstChild("Remotes"),
+        LocalReplicatedStorage
+    }
+    for _, loc in ipairs(locations) do
+        if loc then
+            for _, name in ipairs(nameList) do
+                local remote = loc:FindFirstChild(name, true)
+                if remote then return remote end
+            end
+        end
+    end
+    return nil
+end
+
+local function fireAnyRemote(remote, ...)
+    if not remote then return nil end
+    if remote:IsA("RemoteEvent") then
+        return remote:FireServer(...)
+    elseif remote:IsA("RemoteFunction") then
+        return remote:InvokeServer(...)
     end
 end
 
@@ -104,16 +133,6 @@ local function findTowerByPosition(targetCFrame, maxDist, ignoreTable)
         end
     end
     return closestTower
-end
-
-local function getEventRemote(nameList)
-    local events = LocalReplicatedStorage:FindFirstChild("Events") or LocalReplicatedStorage:FindFirstChild("Remotes") or LocalReplicatedStorage
-    if not events then return nil end
-    for _, name in ipairs(nameList) do
-        local remote = events:FindFirstChild(name, true)
-        if remote then return remote end
-    end
-    return nil
 end
 
 local function getPlacedTowersPlayList(excludeIndex)
@@ -476,7 +495,7 @@ AutoBuyCrateBtn.TextSize = 13
 AutoBuyCrateBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoBuyCrateBtn).CornerRadius = UDim.new(0, 4)
 
--- Detailed Status Info Label
+-- Status Label
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 140)
 StatusLabel.Position = UDim2.new(0.05, 0, 0, 555)
@@ -576,11 +595,7 @@ loadConfigFromFile = function()
             SpeedBtn.BackgroundColor3 = (currentSpeedMultiplier > 1) and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
         end
         
-        if result.autoSummonAmount ~= nil then
-            autoSummonAmount = result.autoSummonAmount
-        elseif result.autoSummon ~= nil then
-            autoSummonAmount = result.autoSummon and 10 or 0
-        end
+        if result.autoSummonAmount ~= nil then autoSummonAmount = result.autoSummonAmount end
         if autoSummonAmount > 0 then
             AutoSummonBtn.Text = string.format("Auto Summon (%dx): ON", autoSummonAmount)
             AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
@@ -750,7 +765,7 @@ rawNamecall = hookmetamethod(game, "__namecall", function(self, ...)
             end
             
             if not spawnedTower and (result == false or result == nil) then
-                logConsole("[REC WARN] SpawnTower gagal (Uang kurang / invalid). Aksi diabaikan.")
+                logConsole("[REC WARN] SpawnTower gagal. Aksi diabaikan.")
                 return result
             end
             
@@ -780,7 +795,7 @@ rawNamecall = hookmetamethod(game, "__namecall", function(self, ...)
         elseif self.Name == "UpgradeTower" then
             local result = rawNamecall(self, ...)
             if result == false then
-                logConsole("[REC WARN] Upgrade ditolak server (Uang kurang/Max). Aksi diabaikan.")
+                logConsole("[REC WARN] Upgrade ditolak server. Aksi diabaikan.")
                 return result
             end
             
@@ -839,8 +854,6 @@ rawNamecall = hookmetamethod(game, "__namecall", function(self, ...)
                 
                 logConsole(string.format("[REC] Upgrade Tower #%d: %s", towerIndex, tostring(towerName)))
                 StatusLabel.Text = string.format("Status: Recording...\n[Aksi %d] Upgrade Tower #%d", #recordedActions, towerIndex)
-            else
-                logConsole("[REC WARN] Upgrade gagal direkam: Tidak ada tower yang terdaftar.")
             end
             return result
         end
@@ -950,10 +963,6 @@ playMacroQueue = function(macroName)
                     end
                 end
                 
-                if not newTowerInstance then
-                    logConsole(string.format("[PLAY ERROR] Gagal Place Tower #%d setelah %d percobaan!", action.towerIndex, maxAttempts))
-                end
-                
             elseif action.actionType == "Upgrade" then
                 StatusLabel.Text = string.format("Status: Playing...\n[%d/%d] Upgrade Tower #%d",
                     index, #recordedActions, action.towerIndex)
@@ -970,19 +979,10 @@ playMacroQueue = function(macroName)
                         if not targetCFrame and globalPlaceActions[action.towerIndex] then
                             targetCFrame = globalPlaceActions[action.towerIndex].cframe
                         end
-                        if not targetCFrame then
-                            for _, act in ipairs(recordedActions) do
-                                if act.actionType == "Place" and act.towerIndex == action.towerIndex then
-                                    targetCFrame = act.cframe
-                                    break
-                                end
-                            end
-                        end
                         
                         if targetCFrame then
                             local ignoreList = getPlacedTowersPlayList(action.towerIndex)
-                            local currentRadius = (attempt > 10) and 15 or 8
-                            targetTower = findTowerByPosition(targetCFrame, currentRadius, ignoreList)
+                            targetTower = findTowerByPosition(targetCFrame, 10, ignoreList)
                             if targetTower then
                                 placedTowersPlay[action.towerIndex] = targetTower
                             end
@@ -990,21 +990,6 @@ playMacroQueue = function(macroName)
                     end
                     
                     if targetTower then
-                        local isMaxLevel = false
-                        pcall(function()
-                            if targetTower:GetAttribute("Max") == true or targetTower:GetAttribute("IsMax") == true then
-                                isMaxLevel = true
-                            elseif targetTower:FindFirstChild("Max") or targetTower:FindFirstChild("IsMax") then
-                                isMaxLevel = true
-                            end
-                        end)
-                        
-                        if isMaxLevel then
-                            logConsole(string.format("[PLAY MAX DETECTED] Tower #%d sudah MAX. Menyeberang ke aksi berikutnya.", action.towerIndex))
-                            successUpgrade = true
-                            break
-                        end
-                        
                         local res
                         if action.extraArgs and #action.extraArgs > 0 then
                             res = upgradeRemote:InvokeServer(targetTower, unpack(action.extraArgs))
@@ -1012,23 +997,14 @@ playMacroQueue = function(macroName)
                             res = upgradeRemote:InvokeServer(targetTower, action.towerName)
                         end
                         
-                        if res == false then
-                            res = upgradeRemote:InvokeServer(targetTower)
-                        end
-                        
                         if res ~= false and res ~= nil then
                             successUpgrade = true
-                            logConsole(string.format("[PLAY %d/%d] Upgraded Tower #%d (%s)", index, #recordedActions, action.towerIndex, targetTower.Name))
+                            logConsole(string.format("[PLAY %d/%d] Upgraded Tower #%d", index, #recordedActions, action.towerIndex))
                             break
                         end
                     end
                     
-                    StatusLabel.Text = string.format("Status: Waiting Cash for Upgrade...\n[%d/%d] Upgrade Tower #%d\nAttempt (%d/%d)", index, #recordedActions, action.towerIndex, attempt, maxAttempts)
                     task.wait(0.25)
-                end
-                
-                if not successUpgrade then
-                    logConsole(string.format("[PLAY TIMEOUT] Upgrade Tower #%d dilewati setelah batas waktu habis.", action.towerIndex))
                 end
             end
         end
@@ -1045,7 +1021,6 @@ end
 
 RecordBtn.MouseButton1Click:Connect(function()
     if isPlaying then return end
-    
     if not isRecording then
         isRecording = true
         recordedActions = {}
@@ -1054,10 +1029,7 @@ RecordBtn.MouseButton1Click:Connect(function()
         local towersFolder = Workspace:FindFirstChild("Towers") or Workspace
         for _, obj in ipairs(towersFolder:GetChildren()) do
             if obj:IsA("Model") and obj ~= LocalPlayer.Character then
-                local primaryPart = obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChildWhichIsA("BasePart")
-                if primaryPart and (obj:FindFirstChild("Humanoid") or obj:GetAttribute("Tower") or string.find(string.lower(obj.Name), "tower")) then
-                    table.insert(placedTowersRecord, obj)
-                end
+                table.insert(placedTowersRecord, obj)
             end
         end
         
@@ -1123,26 +1095,15 @@ RefreshBtn.MouseButton1Click:Connect(function()
 end)
 
 DeleteBtn.MouseButton1Click:Connect(function()
-    if not supportsFileSystem then
-        StatusLabel.Text = "Status: Executor tidak mendukung FileSystem!"
-        return
-    end
-    if selectedMacroFile == "" then
-        StatusLabel.Text = "Status: Pilih/Load file macro terlebih dahulu!"
-        return
-    end
-    
+    if not supportsFileSystem or selectedMacroFile == "" then return end
     local path = FOLDER_NAME .. "/" .. selectedMacroFile .. ".json"
     if isfile(path) then
-        local deletedName = selectedMacroFile
         delfile(path)
         selectedMacroFile = ""
         recordedActions = {}
         SelectLabel.Text = "Selected: None"
-        StatusLabel.Text = string.format("Status: File '%s.json' berhasil dihapus!", deletedName)
+        StatusLabel.Text = "Status: File macro berhasil dihapus!"
         saveConfigToFile()
-    else
-        StatusLabel.Text = "Status: File tidak ditemukan!"
     end
 end)
 
@@ -1153,12 +1114,7 @@ AutoSingleBtn.MouseButton1Click:Connect(function()
 end)
 
 SpeedBtn.MouseButton1Click:Connect(function()
-    if currentSpeedMultiplier == 1 then currentSpeedMultiplier = 2
-    elseif currentSpeedMultiplier == 2 then currentSpeedMultiplier = 3
-    elseif currentSpeedMultiplier == 3 then currentSpeedMultiplier = 4
-    elseif currentSpeedMultiplier == 4 then currentSpeedMultiplier = 5
-    else currentSpeedMultiplier = 1 end
-    
+    currentSpeedMultiplier = (currentSpeedMultiplier % 5) + 1
     SpeedBtn.Text = "Speed: " .. currentSpeedMultiplier .. "x"
     SpeedBtn.BackgroundColor3 = (currentSpeedMultiplier > 1) and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
     setGameSpeed(currentSpeedMultiplier)
@@ -1191,13 +1147,8 @@ AutoSummonBtn.MouseButton1Click:Connect(function()
     elseif autoSummonAmount == 10 then autoSummonAmount = 50
     else autoSummonAmount = 0 end
     
-    if autoSummonAmount > 0 then
-        AutoSummonBtn.Text = string.format("Auto Summon (%dx): ON", autoSummonAmount)
-        AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
-    else
-        AutoSummonBtn.Text = "Auto Summon: OFF"
-        AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
-    end
+    AutoSummonBtn.Text = (autoSummonAmount > 0) and string.format("Auto Summon (%dx): ON", autoSummonAmount) or "Auto Summon: OFF"
+    AutoSummonBtn.BackgroundColor3 = (autoSummonAmount > 0) and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
     saveConfigToFile()
 end)
 
@@ -1207,13 +1158,8 @@ AutoPremSummonBtn.MouseButton1Click:Connect(function()
     elseif autoPremSummonAmount == 10 then autoPremSummonAmount = 50
     else autoPremSummonAmount = 0 end
     
-    if autoPremSummonAmount > 0 then
-        AutoPremSummonBtn.Text = string.format("Prem Summon (%dx): ON", autoPremSummonAmount)
-        AutoPremSummonBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
-    else
-        AutoPremSummonBtn.Text = "Auto Prem Summon: OFF"
-        AutoPremSummonBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
-    end
+    AutoPremSummonBtn.Text = (autoPremSummonAmount > 0) and string.format("Prem Summon (%dx): ON", autoPremSummonAmount) or "Auto Prem Summon: OFF"
+    AutoPremSummonBtn.BackgroundColor3 = (autoPremSummonAmount > 0) and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
     saveConfigToFile()
 end)
 
@@ -1223,13 +1169,8 @@ AutoCrateBtn.MouseButton1Click:Connect(function()
     elseif autoCrateAmount == 10 then autoCrateAmount = 25
     else autoCrateAmount = 0 end
     
-    if autoCrateAmount > 0 then
-        AutoCrateBtn.Text = string.format("Crate (%dx)", autoCrateAmount)
-        AutoCrateBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
-    else
-        AutoCrateBtn.Text = "Crate: OFF"
-        AutoCrateBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
-    end
+    AutoCrateBtn.Text = (autoCrateAmount > 0) and string.format("Crate (%dx)", autoCrateAmount) or "Crate: OFF"
+    AutoCrateBtn.BackgroundColor3 = (autoCrateAmount > 0) and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
     saveConfigToFile()
 end)
 
@@ -1239,13 +1180,8 @@ AutoBuyCrateBtn.MouseButton1Click:Connect(function()
     elseif autoBuyCrateAmount == 3 then autoBuyCrateAmount = 10
     else autoBuyCrateAmount = 0 end
     
-    if autoBuyCrateAmount > 0 then
-        AutoBuyCrateBtn.Text = string.format("Buy Crate (%dx): ON", autoBuyCrateAmount)
-        AutoBuyCrateBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
-    else
-        AutoBuyCrateBtn.Text = "Auto Buy Crate: OFF"
-        AutoBuyCrateBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
-    end
+    AutoBuyCrateBtn.Text = (autoBuyCrateAmount > 0) and string.format("Buy Crate (%dx): ON", autoBuyCrateAmount) or "Auto Buy Crate: OFF"
+    AutoBuyCrateBtn.BackgroundColor3 = (autoBuyCrateAmount > 0) and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
     saveConfigToFile()
 end)
 
@@ -1259,14 +1195,14 @@ end)
 AutoSkipBtn.MouseButton1Click:Connect(function()
     isAutoVoteSkipEnabled = not isAutoVoteSkipEnabled
     AutoSkipBtn.Text = isAutoVoteSkipEnabled and "Auto Skip Wave: ON" or "Auto Skip Wave: OFF"
-    AutoSkipBtn.BackgroundColor3 = isAutoSkipBtn.Text and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+    AutoSkipBtn.BackgroundColor3 = isAutoVoteSkipEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
     saveConfigToFile()
 end)
 
 loadConfigFromFile()
 
 -- ==========================================
--- AUTO ABILITY LOOP
+-- AUTO ABILITY & SKIP LOOPS
 -- ==========================================
 
 task.spawn(function()
@@ -1274,20 +1210,12 @@ task.spawn(function()
         task.wait(2.5)
         if isAutoAbilityEnabled then
             pcall(function()
-                local events = LocalReplicatedStorage:FindFirstChild("Events") or LocalReplicatedStorage:FindFirstChild("Remotes") or LocalReplicatedStorage
-                local activateAbilityRemote = events:FindFirstChild("ActivateAbility", true)
+                local activateAbilityRemote = getAnyRemote({"ActivateAbility"})
                 if activateAbilityRemote then
                     local towersFolder = Workspace:FindFirstChild("Towers") or Workspace
                     for _, tower in ipairs(towersFolder:GetChildren()) do
                         if tower:IsA("Model") and tower ~= LocalPlayer.Character then
-                            if activateAbilityRemote:IsA("RemoteEvent") then
-                                activateAbilityRemote:FireServer(tower)
-                                activateAbilityRemote:FireServer(tower, 1)
-                                activateAbilityRemote:FireServer(tower, 2)
-                            elseif activateAbilityRemote:IsA("RemoteFunction") then
-                                activateAbilityRemote:InvokeServer(tower)
-                                activateAbilityRemote:InvokeServer(tower, 1)
-                            end
+                            fireAnyRemote(activateAbilityRemote, tower)
                             task.wait(0.2)
                         end
                     end
@@ -1297,23 +1225,14 @@ task.spawn(function()
     end
 end)
 
--- ==========================================
--- AUTO VOTE SKIP LOOP
--- ==========================================
-
 task.spawn(function()
     while true do
         task.wait(1.5)
         if isAutoVoteSkipEnabled then
             pcall(function()
-                local functionsFolder = LocalReplicatedStorage:FindFirstChild("Functions") or LocalReplicatedStorage:FindFirstChild("Remotes") or LocalReplicatedStorage
-                local voteSkipRemote = functionsFolder and functionsFolder:FindFirstChild("VoteSkip", true)
+                local voteSkipRemote = getAnyRemote({"VoteSkip", "Voteskip"})
                 if voteSkipRemote then
-                    if voteSkipRemote:IsA("RemoteFunction") then
-                        voteSkipRemote:InvokeServer()
-                    elseif voteSkipRemote:IsA("RemoteEvent") then
-                        voteSkipRemote:FireServer()
-                    end
+                    fireAnyRemote(voteSkipRemote)
                 end
             end)
         end
@@ -1321,177 +1240,71 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO OPEN CRATE LOOP
--- ==========================================
-
-task.spawn(function()
-    while true do
-        task.wait(2.5)
-        if autoCrateAmount > 0 then
-            pcall(function()
-                local remotes = LocalReplicatedStorage:FindFirstChild("Remotes")
-                local inventoryFolder = remotes and remotes:FindFirstChild("Inventory")
-                local openCrateRemote = inventoryFolder and inventoryFolder:FindFirstChild("OpenCrate")
-                if openCrateRemote then
-                    local crateName = CrateNameBox.Text
-                    if crateName ~= "" then
-                        if openCrateRemote:IsA("RemoteFunction") then
-                            openCrateRemote:InvokeServer(crateName, autoCrateAmount)
-                        elseif openCrateRemote:IsA("RemoteEvent") then
-                            openCrateRemote:FireServer(crateName, autoCrateAmount)
-                        end
-                        logConsole(string.format("Auto Open Crate (%s x%d) dieksekusi", crateName, autoCrateAmount))
-                    end
-                end
-            end)
-        end
-    end
-end)
-
--- ==========================================
--- AUTO BUY CRATE LOOP
--- ==========================================
-
-task.spawn(function()
-    while true do
-        task.wait(2.5)
-        if autoBuyCrateAmount > 0 then
-            pcall(function()
-                local remotes = LocalReplicatedStorage:FindFirstChild("Remotes")
-                local inventoryFolder = remotes and remotes:FindFirstChild("Inventory")
-                local buyCrateRemote = inventoryFolder and inventoryFolder:FindFirstChild("BuyCrate")
-                if buyCrateRemote then
-                    local crateName = CrateNameBox.Text
-                    if crateName ~= "" then
-                        if buyCrateRemote:IsA("RemoteEvent") then
-                            buyCrateRemote:FireServer(crateName, autoBuyCrateAmount)
-                        elseif buyCrateRemote:IsA("RemoteFunction") then
-                            buyCrateRemote:InvokeServer(crateName, autoBuyCrateAmount)
-                        end
-                        logConsole(string.format("Auto Buy Crate (%s x%d) dieksekusi", crateName, autoBuyCrateAmount))
-                    end
-                end
-            end)
-        end
-    end
-end)
-
--- ==========================================
--- SMART AUTO VOTE MAP FUNCTION
+-- AUTO VOTE EXECUTORS (MAP, DIFF, MUTATOR)
 -- ==========================================
 
 local function executeMapVote()
     local mapInput = MapNameBox.Text
-    local voteMapRemote = getEventRemote({"VoteForMap", "VoteMap"})
-    if not voteMapRemote then return end
-    
-    local targetChoice = nil
-    local numInput = tonumber(mapInput)
-    
-    if numInput then
-        targetChoice = numInput
-    else
-        pcall(function()
-            for _, gui in ipairs(playerGui:GetChildren()) do
-                if gui:IsA("ScreenGui") and (string.find(string.lower(gui.Name), "vote") or string.find(string.lower(gui.Name), "map")) then
-                    for _, desc in ipairs(gui:GetDescendants()) do
-                        if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and string.find(string.lower(desc.Text), string.lower(mapInput)) then
-                            local slotNum = desc.Name:match("%d+") or (desc.Parent and desc.Parent.Name:match("%d+"))
-                            if slotNum then
-                                targetChoice = tonumber(slotNum) or slotNum
-                                break
-                            end
-                        end
-                    end
-                end
-            end
-        end)
+    if mapInput == "" then return end
+
+    local voteMapRemote = getAnyRemote({"VoteForMap", "VoteMap", "MapVote", "Vote"})
+    if not voteMapRemote then
+        logConsole("[MAP WARN] Remote Map Vote tidak ditemukan.")
+        return
     end
-    
+
     pcall(function()
-        if targetChoice then
-            voteMapRemote:FireServer(targetChoice)
-            logConsole(string.format("Auto Vote Map dikirim via Slot/Pilihan: %s", tostring(targetChoice)))
+        local numInput = tonumber(mapInput)
+        if numInput then
+            fireAnyRemote(voteMapRemote, numInput)
         else
-            voteMapRemote:FireServer(mapInput)
-            logConsole("Auto Vote Map dikirim via Nama String: " .. mapInput)
+            fireAnyRemote(voteMapRemote, mapInput)
         end
     end)
+    logConsole("Auto Vote Map dikirim: " .. mapInput)
 end
 
--- ==========================================
--- PRECISE AUTO VOTE MUTATOR FUNCTION
--- ==========================================
+local function executeDiffVote()
+    local diffInput = DiffNameBox.Text
+    if diffInput == "" then return end
+
+    local voteDiffRemote = getAnyRemote({"VoteForComplication", "VoteComplication", "VoteDifficulty", "DifficultyVote", "VoteDiff"})
+    if not voteDiffRemote then
+        logConsole("[DIFF WARN] Remote Difficulty Vote tidak ditemukan.")
+        return
+    end
+
+    pcall(function()
+        local numInput = tonumber(diffInput)
+        if numInput then
+            fireAnyRemote(voteDiffRemote, numInput)
+        else
+            fireAnyRemote(voteDiffRemote, diffInput)
+        end
+    end)
+    logConsole("Auto Vote Difficulty dikirim: " .. diffInput)
+end
 
 local function executeMutatorVote()
     local eventsFolder = LocalReplicatedStorage:FindFirstChild("Events")
     local mutatorRemote = eventsFolder and eventsFolder:FindFirstChild("SlopMutator")
     
     if not mutatorRemote then
-        logConsole("[MUTATOR ERROR] Remote SlopMutator tidak ditemukan di ReplicatedStorage.Events!")
+        logConsole("[MUTATOR ERROR] Remote SlopMutator tidak ditemukan!")
         return
     end
 
     local inputName = MutatorNameBox.Text
     if inputName == "" then return end
 
-    for attempt = 1, 5 do
-        pcall(function()
-            mutatorRemote:FireServer("Vote", inputName)
-        end)
-        logConsole(string.format("Auto Vote Mutator (%d/5) dikirim: FireServer('Vote', '%s')", attempt, inputName))
-        task.wait(0.5)
-    end
+    pcall(function()
+        mutatorRemote:FireServer("Vote", inputName)
+    end)
+    logConsole(string.format("Auto Vote Mutator dikirim: FireServer('Vote', '%s')", inputName))
 end
 
 -- ==========================================
--- AUTO SUMMON LOOP
--- ==========================================
-
-task.spawn(function()
-    while true do
-        task.wait(2)
-        if autoSummonAmount > 0 then
-            pcall(function()
-                local remotes = LocalReplicatedStorage:FindFirstChild("Remotes")
-                local summonFolder = remotes and remotes:FindFirstChild("Summon")
-                local summonRemote = summonFolder and summonFolder:FindFirstChild("Summon")
-                if summonRemote then
-                    summonRemote:InvokeServer(autoSummonAmount)
-                    logConsole(string.format("Auto Summon (%dx) dieksekusi", autoSummonAmount))
-                end
-            end)
-        end
-    end
-end)
-
--- ==========================================
--- AUTO PREMIUM SUMMON LOOP
--- ==========================================
-
-task.spawn(function()
-    while true do
-        task.wait(2)
-        if autoPremSummonAmount > 0 then
-            pcall(function()
-                local remotes = LocalReplicatedStorage:FindFirstChild("Remotes")
-                local summonFolder = remotes and remotes:FindFirstChild("Summon")
-                local premSummonRemote = summonFolder and summonFolder:FindFirstChild("SummonPremium")
-                if premSummonRemote then
-                    if premSummonRemote:IsA("RemoteFunction") then
-                        premSummonRemote:InvokeServer(autoPremSummonAmount)
-                    elseif premSummonRemote:IsA("RemoteEvent") then
-                        premSummonRemote:FireServer(autoPremSummonAmount)
-                    end
-                    logConsole(string.format("Auto Premium Summon (%dx) dieksekusi", autoPremSummonAmount))
-                end
-            end)
-        end
-    end
-end)
-
--- ==========================================
--- AUTO PLAY & VOTE LOOP
+-- CONTROL LOOP & GAME STATE MONITOR
 -- ==========================================
 
 local function isMatchActuallyStarted()
@@ -1505,39 +1318,37 @@ task.spawn(function()
     while true do
         task.wait(1)
         
+        local matchStarted = isMatchActuallyStarted()
+        
+        -- Deteksi Transisi: Jika baru saja selesai match/kembali ke Lobby
+        if wasInMatch and not matchStarted then
+            hasVotedThisSession = false
+            hasAutoPlayedThisSession = false
+        end
+        wasInMatch = matchStarted
+
+        -- Fase Voting (Hanya Berjalan 1 Kali per Sesi/Lobby)
         if (isAutoVoteEnabled or isAutoVoteDiffEnabled or isAutoVoteMutatorEnabled) and not hasVotedThisSession then
             hasVotedThisSession = true
             task.spawn(function()
                 if isAutoVoteEnabled then
-                    for attempt = 1, 3 do
-                        executeMapVote()
-                        task.wait(0.5)
-                    end
+                    executeMapVote()
+                    task.wait(1)
                 end
                 
-                task.wait(2)
-                
                 if isAutoVoteDiffEnabled then
-                    local voteDiffRemote = getEventRemote({"VoteForComplication", "VoteComplication"})
-                    if voteDiffRemote then
-                        for attempt = 1, 5 do
-                            pcall(function()
-                                voteDiffRemote:FireServer(DiffNameBox.Text)
-                            end)
-                            logConsole(string.format("Auto Vote Difficulty (%d/5) dikirim: %s", attempt, DiffNameBox.Text))
-                            task.wait(0.8)
-                        end
-                    end
+                    executeDiffVote()
+                    task.wait(1)
                 end
 
                 if isAutoVoteMutatorEnabled then
-                    task.wait(1)
                     executeMutatorVote()
                 end
             end)
         end
         
-        if isMatchActuallyStarted() then
+        -- Fase Playback Macro
+        if matchStarted then
             setGameSpeed(currentSpeedMultiplier)
             if isAutoPlaySingleEnabled and not isPlaying and not isRecording and not hasAutoPlayedThisSession then
                 hasAutoPlayedThisSession = true
@@ -1550,21 +1361,15 @@ task.spawn(function()
                     logConsole("[AUTO PLAY WARN] Tidak ada macro yang terpilih!")
                 end
             end
-        else
-            hasAutoPlayedThisSession = false
-            hasVotedThisSession = false
         end
     end
 end)
 
--- ==========================================
--- SAFE AUTO MINIMIZE ON STARTUP
--- ==========================================
+-- Safe Auto-Minimize
 task.defer(function()
     task.wait(0.5)
     isMinimized = true
     MainFrame.Size = UDim2.new(0, 240, 0, 30)
     ContentFrame.Visible = false
     MinimizeBtn.Text = "+"
-    logConsole("[UI]: Auto-minimize berhasil diaktifkan secara aman.")
 end)
