@@ -372,7 +372,7 @@ MutatorNameBox.Size = UDim2.new(0.6, 0, 0, 30)
 MutatorNameBox.Position = UDim2.new(0.05, 0, 0, 310)
 MutatorNameBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 MutatorNameBox.Text = "Gigantism"
-MutatorNameBox.PlaceholderText = "Mutator Name"
+MutatorNameBox.PlaceholderText = "Mutator / Slot (1-4)"
 MutatorNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 MutatorNameBox.Font = Enum.Font.SourceSans
 MutatorNameBox.TextSize = 12
@@ -1420,6 +1420,45 @@ local function executeMapVote()
 end
 
 -- ==========================================
+-- SMART AUTO VOTE MUTATOR FUNCTION
+-- ==========================================
+
+local function executeMutatorVote()
+    local mutatorRemote = getEventRemote({"SlopMutator", "VoteMutator", "MutatorVote", "SlopMutators"})
+    if not mutatorRemote then
+        logConsole("[MUTATOR ERROR] Remote SlopMutator tidak ditemukan!")
+        return
+    end
+
+    local inputName = MutatorNameBox.Text
+    local numInput = tonumber(inputName)
+
+    for attempt = 1, 5 do
+        pcall(function()
+            if mutatorRemote:IsA("RemoteEvent") then
+                if numInput then
+                    mutatorRemote:FireServer(numInput)
+                    mutatorRemote:FireServer("Vote", numInput)
+                else
+                    mutatorRemote:FireServer(inputName)
+                    mutatorRemote:FireServer("Vote", inputName)
+                    mutatorRemote:FireServer(1) -- Fallback jika nama tidak terdeteksi
+                end
+            elseif mutatorRemote:IsA("RemoteFunction") then
+                if numInput then
+                    mutatorRemote:InvokeServer(numInput)
+                else
+                    mutatorRemote:InvokeServer(inputName)
+                    mutatorRemote:InvokeServer("Vote", inputName)
+                end
+            end
+        end)
+        logConsole(string.format("Auto Vote Mutator (%d/5) dikirim untuk: %s", attempt, inputName))
+        task.wait(0.8)
+    end
+end
+
+-- ==========================================
 -- AUTO SUMMON LOOP
 -- ==========================================
 
@@ -1490,7 +1529,7 @@ task.spawn(function()
                     end
                 end
                 
-                task.wait(3)
+                task.wait(2)
                 
                 if isAutoVoteDiffEnabled then
                     local voteDiffRemote = getEventRemote({"VoteForComplication", "VoteComplication"})
@@ -1500,26 +1539,14 @@ task.spawn(function()
                                 voteDiffRemote:FireServer(DiffNameBox.Text)
                             end)
                             logConsole(string.format("Auto Vote Difficulty (%d/5) dikirim: %s", attempt, DiffNameBox.Text))
-                            task.wait(1)
+                            task.wait(0.8)
                         end
                     end
                 end
 
                 if isAutoVoteMutatorEnabled then
-                    local mutatorRemote = getEventRemote({"SlopMutator"}) or (LocalReplicatedStorage:FindFirstChild("Events") and LocalReplicatedStorage.Events:FindFirstChild("SlopMutator"))
-                    if mutatorRemote then
-                        for attempt = 1, 5 do
-                            pcall(function()
-                                if mutatorRemote:IsA("RemoteEvent") then
-                                    mutatorRemote:FireServer("Vote", MutatorNameBox.Text)
-                                elseif mutatorRemote:IsA("RemoteFunction") then
-                                    mutatorRemote:InvokeServer("Vote", MutatorNameBox.Text)
-                                end
-                            end)
-                            logConsole(string.format("Auto Vote Mutator (%d/5) dikirim: %s", attempt, MutatorNameBox.Text))
-                            task.wait(1)
-                        end
-                    end
+                    task.wait(1)
+                    executeMutatorVote()
                 end
             end)
         end
