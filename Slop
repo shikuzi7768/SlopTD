@@ -71,7 +71,6 @@ local function setGameSpeed(speed)
     end
 end
 
--- Fungsi Pencari Remote Universal (Mendukung Events, Functions, & Remotes)
 local function getAnyRemote(nameList)
     local locations = {
         LocalReplicatedStorage:FindFirstChild("Events"),
@@ -176,7 +175,6 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0, 8)
 UICorner.Parent = MainFrame
 
--- Top Bar Frame
 local TopBar = Instance.new("Frame")
 TopBar.Size = UDim2.new(1, 0, 0, 30)
 TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
@@ -198,7 +196,6 @@ Title.Font = Enum.Font.SourceSansBold
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Title.Parent = TopBar
 
--- Minimize Button
 local MinimizeBtn = Instance.new("TextButton")
 MinimizeBtn.Size = UDim2.new(0, 24, 0, 24)
 MinimizeBtn.Position = UDim2.new(1, -52, 0, 3)
@@ -210,7 +207,6 @@ MinimizeBtn.TextSize = 16
 MinimizeBtn.Parent = TopBar
 Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 4)
 
--- Close Button
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size = UDim2.new(0, 24, 0, 24)
 CloseBtn.Position = UDim2.new(1, -27, 0, 3)
@@ -222,14 +218,12 @@ CloseBtn.TextSize = 13
 CloseBtn.Parent = TopBar
 Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 4)
 
--- Container
 local ContentFrame = Instance.new("Frame")
 ContentFrame.Size = UDim2.new(1, 0, 1, -30)
 ContentFrame.Position = UDim2.new(0, 0, 0, 30)
 ContentFrame.BackgroundTransparency = 1
 ContentFrame.Parent = MainFrame
 
--- Record Button
 local RecordBtn = Instance.new("TextButton")
 RecordBtn.Size = UDim2.new(0.9, 0, 0, 30)
 RecordBtn.Position = UDim2.new(0.05, 0, 0, 5)
@@ -241,7 +235,6 @@ RecordBtn.TextSize = 14
 RecordBtn.Parent = ContentFrame
 Instance.new("UICorner", RecordBtn).CornerRadius = UDim.new(0, 4)
 
--- Play Button
 local PlayBtn = Instance.new("TextButton")
 PlayBtn.Size = UDim2.new(0.9, 0, 0, 30)
 PlayBtn.Position = UDim2.new(0.05, 0, 0, 40)
@@ -253,7 +246,6 @@ PlayBtn.TextSize = 13
 PlayBtn.Parent = ContentFrame
 Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(0, 4)
 
--- Save Input Box
 local SaveNameBox = Instance.new("TextBox")
 SaveNameBox.Size = UDim2.new(0.6, 0, 0, 30)
 SaveNameBox.Position = UDim2.new(0.05, 0, 0, 75)
@@ -265,7 +257,6 @@ SaveNameBox.TextSize = 13
 SaveNameBox.Parent = ContentFrame
 Instance.new("UICorner", SaveNameBox).CornerRadius = UDim.new(0, 4)
 
--- Save Button
 local SaveBtn = Instance.new("TextButton")
 SaveBtn.Size = UDim2.new(0.28, 0, 0, 30)
 SaveBtn.Position = UDim2.new(0.67, 0, 0, 75)
@@ -277,7 +268,6 @@ SaveBtn.TextSize = 14
 SaveBtn.Parent = ContentFrame
 Instance.new("UICorner", SaveBtn).CornerRadius = UDim.new(0, 4)
 
--- Selected Macro Label
 local SelectLabel = Instance.new("TextLabel")
 SelectLabel.Size = UDim2.new(0.9, 0, 0, 25)
 SelectLabel.Position = UDim2.new(0.05, 0, 0, 110)
@@ -289,7 +279,6 @@ SelectLabel.TextSize = 12
 SelectLabel.Parent = ContentFrame
 Instance.new("UICorner", SelectLabel).CornerRadius = UDim.new(0, 4)
 
--- Refresh/Switch Button
 local RefreshBtn = Instance.new("TextButton")
 RefreshBtn.Size = UDim2.new(0.43, 0, 0, 25)
 RefreshBtn.Position = UDim2.new(0.05, 0, 0, 140)
@@ -301,7 +290,6 @@ RefreshBtn.TextSize = 12
 RefreshBtn.Parent = ContentFrame
 Instance.new("UICorner", RefreshBtn).CornerRadius = UDim.new(0, 4)
 
--- Delete Macro Button
 local DeleteBtn = Instance.new("TextButton")
 DeleteBtn.Size = UDim2.new(0.43, 0, 0, 25)
 DeleteBtn.Position = UDim2.new(0.52, 0, 0, 140)
@@ -313,7 +301,6 @@ DeleteBtn.TextSize = 12
 DeleteBtn.Parent = ContentFrame
 Instance.new("UICorner", DeleteBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Play Toggle Button
 local AutoSingleBtn = Instance.new("TextButton")
 AutoSingleBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoSingleBtn.Position = UDim2.new(0.05, 0, 0, 170)
@@ -325,7 +312,6 @@ AutoSingleBtn.TextSize = 13
 AutoSingleBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoSingleBtn).CornerRadius = UDim.new(0, 4)
 
--- Speed Multiplier Toggle Button
 local SpeedBtn = Instance.new("TextButton")
 SpeedBtn.Size = UDim2.new(0.9, 0, 0, 30)
 SpeedBtn.Position = UDim2.new(0.05, 0, 0, 205)
@@ -337,7 +323,6 @@ SpeedBtn.TextSize = 13
 SpeedBtn.Parent = ContentFrame
 Instance.new("UICorner", SpeedBtn).CornerRadius = UDim.new(0, 4)
 
--- Map Input Box
 local MapNameBox = Instance.new("TextBox")
 MapNameBox.Size = UDim2.new(0.6, 0, 0, 30)
 MapNameBox.Position = UDim2.new(0.05, 0, 0, 240)
@@ -349,7 +334,6 @@ MapNameBox.TextSize = 13
 MapNameBox.Parent = ContentFrame
 Instance.new("UICorner", MapNameBox).CornerRadius = UDim.new(0, 4)
 
--- Auto Vote Map Toggle Button
 local AutoVoteBtn = Instance.new("TextButton")
 AutoVoteBtn.Size = UDim2.new(0.28, 0, 0, 30)
 AutoVoteBtn.Position = UDim2.new(0.67, 0, 0, 240)
@@ -361,7 +345,6 @@ AutoVoteBtn.TextSize = 11
 AutoVoteBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoVoteBtn).CornerRadius = UDim.new(0, 4)
 
--- Difficulty Input Box
 local DiffNameBox = Instance.new("TextBox")
 DiffNameBox.Size = UDim2.new(0.6, 0, 0, 30)
 DiffNameBox.Position = UDim2.new(0.05, 0, 0, 275)
@@ -373,7 +356,6 @@ DiffNameBox.TextSize = 13
 DiffNameBox.Parent = ContentFrame
 Instance.new("UICorner", DiffNameBox).CornerRadius = UDim.new(0, 4)
 
--- Auto Vote Difficulty Toggle Button
 local AutoVoteDiffBtn = Instance.new("TextButton")
 AutoVoteDiffBtn.Size = UDim2.new(0.28, 0, 0, 30)
 AutoVoteDiffBtn.Position = UDim2.new(0.67, 0, 0, 275)
@@ -385,20 +367,18 @@ AutoVoteDiffBtn.TextSize = 11
 AutoVoteDiffBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoVoteDiffBtn).CornerRadius = UDim.new(0, 4)
 
--- Mutator Input Box
 local MutatorNameBox = Instance.new("TextBox")
 MutatorNameBox.Size = UDim2.new(0.6, 0, 0, 30)
 MutatorNameBox.Position = UDim2.new(0.05, 0, 0, 310)
 MutatorNameBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 MutatorNameBox.Text = "ArmoredSlop"
-MutatorNameBox.PlaceholderText = "Nama Mutator (Contoh: ArmoredSlop)"
+MutatorNameBox.PlaceholderText = "Nama Mutator"
 MutatorNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 MutatorNameBox.Font = Enum.Font.SourceSans
 MutatorNameBox.TextSize = 12
 MutatorNameBox.Parent = ContentFrame
 Instance.new("UICorner", MutatorNameBox).CornerRadius = UDim.new(0, 4)
 
--- Auto Vote Mutator Toggle Button
 local AutoVoteMutatorBtn = Instance.new("TextButton")
 AutoVoteMutatorBtn.Size = UDim2.new(0.28, 0, 0, 30)
 AutoVoteMutatorBtn.Position = UDim2.new(0.67, 0, 0, 310)
@@ -410,7 +390,6 @@ AutoVoteMutatorBtn.TextSize = 10
 AutoVoteMutatorBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoVoteMutatorBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Summon Toggle Button
 local AutoSummonBtn = Instance.new("TextButton")
 AutoSummonBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoSummonBtn.Position = UDim2.new(0.05, 0, 0, 345)
@@ -422,7 +401,6 @@ AutoSummonBtn.TextSize = 13
 AutoSummonBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoSummonBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Ability Toggle Button
 local AutoAbilityBtn = Instance.new("TextButton")
 AutoAbilityBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoAbilityBtn.Position = UDim2.new(0.05, 0, 0, 380)
@@ -434,7 +412,6 @@ AutoAbilityBtn.TextSize = 13
 AutoAbilityBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoAbilityBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Vote Skip Toggle Button
 local AutoSkipBtn = Instance.new("TextButton")
 AutoSkipBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoSkipBtn.Position = UDim2.new(0.05, 0, 0, 415)
@@ -446,7 +423,6 @@ AutoSkipBtn.TextSize = 13
 AutoSkipBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoSkipBtn).CornerRadius = UDim.new(0, 4)
 
--- Crate Name Input Box
 local CrateNameBox = Instance.new("TextBox")
 CrateNameBox.Size = UDim2.new(0.6, 0, 0, 30)
 CrateNameBox.Position = UDim2.new(0.05, 0, 0, 450)
@@ -459,7 +435,6 @@ CrateNameBox.TextSize = 12
 CrateNameBox.Parent = ContentFrame
 Instance.new("UICorner", CrateNameBox).CornerRadius = UDim.new(0, 4)
 
--- Auto Open Crate Toggle Button
 local AutoCrateBtn = Instance.new("TextButton")
 AutoCrateBtn.Size = UDim2.new(0.28, 0, 0, 30)
 AutoCrateBtn.Position = UDim2.new(0.67, 0, 0, 450)
@@ -471,7 +446,6 @@ AutoCrateBtn.TextSize = 11
 AutoCrateBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoCrateBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Premium Summon Toggle Button
 local AutoPremSummonBtn = Instance.new("TextButton")
 AutoPremSummonBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoPremSummonBtn.Position = UDim2.new(0.05, 0, 0, 485)
@@ -483,7 +457,6 @@ AutoPremSummonBtn.TextSize = 13
 AutoPremSummonBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoPremSummonBtn).CornerRadius = UDim.new(0, 4)
 
--- Auto Buy Crate Toggle Button
 local AutoBuyCrateBtn = Instance.new("TextButton")
 AutoBuyCrateBtn.Size = UDim2.new(0.9, 0, 0, 30)
 AutoBuyCrateBtn.Position = UDim2.new(0.05, 0, 0, 520)
@@ -495,7 +468,6 @@ AutoBuyCrateBtn.TextSize = 13
 AutoBuyCrateBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoBuyCrateBtn).CornerRadius = UDim.new(0, 4)
 
--- Status Label
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(0.9, 0, 0, 140)
 StatusLabel.Position = UDim2.new(0.05, 0, 0, 555)
@@ -1247,7 +1219,7 @@ local function executeMapVote()
     local mapInput = MapNameBox.Text
     if mapInput == "" then return end
 
-    local voteMapRemote = getAnyRemote({"VoteForMap", "VoteMap", "MapVote", "Vote"})
+    local voteMapRemote = getAnyRemote({"VoteForMap", "VoteMap", "MapVote", "Vote", "MapSelect"})
     if not voteMapRemote then
         logConsole("[MAP WARN] Remote Map Vote tidak ditemukan.")
         return
@@ -1320,30 +1292,48 @@ task.spawn(function()
         
         local matchStarted = isMatchActuallyStarted()
         
-        -- Deteksi Transisi: Jika baru saja selesai match/kembali ke Lobby
+        -- Deteksi Transisi: Selesai match/kembali ke Lobby
         if wasInMatch and not matchStarted then
             hasVotedThisSession = false
             hasAutoPlayedThisSession = false
         end
         wasInMatch = matchStarted
 
-        -- Fase Voting (Hanya Berjalan 1 Kali per Sesi/Lobby)
-        if (isAutoVoteEnabled or isAutoVoteDiffEnabled or isAutoVoteMutatorEnabled) and not hasVotedThisSession then
+        -- URUTAN VOTING BERKELANJUTAN (5 DETIK PER TAHAP)
+        if (isAutoVoteEnabled or isAutoVoteDiffEnabled or isAutoVoteMutatorEnabled) and not hasVotedThisSession and not matchStarted then
             hasVotedThisSession = true
             task.spawn(function()
+                -- 1. Tahap Vote Map (Berjalan 5 Detik)
                 if isAutoVoteEnabled then
-                    executeMapVote()
-                    task.wait(1)
-                end
-                
-                if isAutoVoteDiffEnabled then
-                    executeDiffVote()
-                    task.wait(1)
+                    logConsole("[VOTE] Memulai fase Vote Map (5 detik)...")
+                    for i = 1, 5 do
+                        StatusLabel.Text = string.format("Status: Voting Map...\n[Map: %s] (%ds / 5s)", MapNameBox.Text, i)
+                        executeMapVote()
+                        task.wait(1)
+                    end
                 end
 
-                if isAutoVoteMutatorEnabled then
-                    executeMutatorVote()
+                -- 2. Tahap Vote Difficulty (Berjalan 5 Detik)
+                if isAutoVoteDiffEnabled then
+                    logConsole("[VOTE] Memulai fase Vote Difficulty (5 detik)...")
+                    for i = 1, 5 do
+                        StatusLabel.Text = string.format("Status: Voting Difficulty...\n[Diff: %s] (%ds / 5s)", DiffNameBox.Text, i)
+                        executeDiffVote()
+                        task.wait(1)
+                    end
                 end
+
+                -- 3. Tahap Vote Mutator (Berjalan 5 Detik)
+                if isAutoVoteMutatorEnabled then
+                    logConsole("[VOTE] Memulai fase Vote Mutator (5 detik)...")
+                    for i = 1, 5 do
+                        StatusLabel.Text = string.format("Status: Voting Mutator...\n[Mutator: %s] (%ds / 5s)", MutatorNameBox.Text, i)
+                        executeMutatorVote()
+                        task.wait(1)
+                    end
+                end
+
+                StatusLabel.Text = "Status: Urutan Voting Selesai!"
             end)
         end
         
