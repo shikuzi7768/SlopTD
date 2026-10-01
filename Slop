@@ -43,7 +43,6 @@ local isAutoVoteSkipEnabled = false
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
-local lastDetectedMapName = ""
 
 -- Auto Vote Variables
 local isAutoVoteEnabled = false
@@ -72,7 +71,7 @@ parseMultiMacroList = function(text)
 end
 
 -- ==========================================
--- HELPER FUNCTIONS (ENHANCED TOWER LOOKUP)
+-- HELPER FUNCTIONS
 -- ==========================================
 
 local function setGameSpeed(speed)
@@ -408,7 +407,7 @@ Instance.new("UICorner", DiffNameBox).CornerRadius = UDim.new(0, 4)
 
 -- Auto Vote Difficulty Toggle Button
 local AutoVoteDiffBtn = Instance.new("TextButton")
-AutoVoteDiffBtn.Size = UDim2.new(0.28, 0, 0, 30)
+AutoVoteDiffBtn.Size = UDim2.new(0.28, 0, 0, 310)
 AutoVoteDiffBtn.Position = UDim2.new(0.67, 0, 0, 310)
 AutoVoteDiffBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoVoteDiffBtn.Text = "Diff ON"
@@ -666,6 +665,8 @@ loadConfigFromFile = function()
         if result.selectedMacro and result.selectedMacro ~= "" then
             loadMacroFromFile(result.selectedMacro)
         end
+        
+        logConsole(string.format("[CONFIG LOADED] Multi Index Saat Ini: #%d", currentMultiMacroIndex))
     end
 end
 
@@ -1065,19 +1066,6 @@ playMacroQueue = function(macroName)
         logConsole("--- Playback Selesai ---")
         StatusLabel.Text = "Status: Playback Finished!"
         isPlaying = false
-
-        -- PERBAIKAN MULTI-MACRO: Langsung naikkan urutan & simpan config setelah makro selesai
-        if isMultiMacroEnabled then
-            multiMacroQueue = parseMultiMacroList(MultiMacroBox.Text)
-            if #multiMacroQueue > 0 then
-                currentMultiMacroIndex = currentMultiMacroIndex + 1
-                if currentMultiMacroIndex > #multiMacroQueue then
-                    currentMultiMacroIndex = 1 -- Loop ke makro pertama
-                end
-                saveConfigToFile()
-                logConsole(string.format("[MULTI MACRO SUCCESS] Makro selesai. Urutan berikutnya disiapkan: #%d (%s)", currentMultiMacroIndex, tostring(multiMacroQueue[currentMultiMacroIndex])))
-            end
-        end
     end)
 end
 
@@ -1522,14 +1510,22 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO PLAY & VOTE LOOP (PERSISTENT MULTI-MACRO)
+-- AUTO PLAY & VOTE LOOP (UNIVERSAL DETECTOR)
 -- ==========================================
 
 local function isMatchActuallyStarted()
     local functionsFolder = LocalReplicatedStorage:FindFirstChild("Functions")
     local spawnRemote = functionsFolder and functionsFolder:FindFirstChild("SpawnTower")
-    local mapFolder = Workspace:FindFirstChild("Map") or Workspace:FindFirstChild("Board")
-    return (spawnRemote ~= nil and mapFolder ~= nil)
+    
+    -- Universal map detection (Lebih fleksibel mendeteksi map Raid 2)
+    local hasMapContainer = Workspace:FindFirstChild("Towers") 
+                         or Workspace:FindFirstChild("Map") 
+                         or Workspace:FindFirstChild("Board") 
+                         or Workspace:FindFirstChild("Stage")
+                         or Workspace:FindFirstChild("RaidMap")
+                         or Workspace:FindFirstChild("Ingame")
+    
+    return (spawnRemote ~= nil or hasMapContainer ~= nil)
 end
 
 task.spawn(function()
@@ -1578,6 +1574,15 @@ task.spawn(function()
                         end
                         macroToPlay = multiMacroQueue[currentMultiMacroIndex]
                         logConsole(string.format("[MULTI MACRO] Menjalankan Makro (#%d dari %d): %s", currentMultiMacroIndex, #multiMacroQueue, macroToPlay))
+                        
+                        -- PENTING: Langsung simpan urutan BERIKUTNYA ke file saat playback dimulai.
+                        -- Ini menjamin saat game teleport ke Raid 2, config.json sudah menyimpan index #2!
+                        currentMultiMacroIndex = currentMultiMacroIndex + 1
+                        if currentMultiMacroIndex > #multiMacroQueue then
+                            currentMultiMacroIndex = 1
+                        end
+                        saveConfigToFile()
+                        logConsole(string.format("[MULTI MACRO] Index disiapkan untuk map berikutnya: #%d", currentMultiMacroIndex))
                     end
                 else
                     macroToPlay = selectedMacroFile
