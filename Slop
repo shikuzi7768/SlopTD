@@ -29,6 +29,12 @@ local selectedMacroFile = ""
 local isAutoPlaySingleEnabled = false
 local currentSpeedMultiplier = 1
 
+-- Multi-Macro Variables
+local isMultiMacroEnabled = false
+local multiMacroQueue = {}
+local currentMultiMacroIndex = 1
+local playedPreviousMatch = false
+
 local autoSummonAmount = 0 -- 0 = OFF, 10 = 10x, 50 = 50x
 local autoPremSummonAmount = 0 -- 0 = OFF, 1 = 1x, 10 = 10x, 50 = 50x
 local autoCrateAmount = 0 -- 0 = OFF, 1 = 1x, 10 = 10x, 25 = 25x
@@ -53,7 +59,17 @@ local function logConsole(msg)
 end
 
 -- Forward Declarations
-local saveConfigToFile, loadConfigFromFile, loadMacroFromFile, playMacroQueue, updateAutoPlayUI
+local saveConfigToFile, loadConfigFromFile, loadMacroFromFile, playMacroQueue, updateAutoPlayUI, parseMultiMacroList
+
+parseMultiMacroList = function(text)
+    local queue = {}
+    if text then
+        for name in string.gmatch(text, "[^,%s]+") do
+            table.insert(queue, name)
+        end
+    end
+    return queue
+end
 
 -- ==========================================
 -- HELPER FUNCTIONS (ENHANCED TOWER LOOKUP)
@@ -143,7 +159,7 @@ end
 ScreenGui.Parent = playerGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 240, 0, 685)
+MainFrame.Size = UDim2.new(0, 240, 0, 720)
 MainFrame.Position = UDim2.new(0.02, 0, 0.1, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
@@ -305,10 +321,35 @@ AutoSingleBtn.TextSize = 13
 AutoSingleBtn.Parent = ContentFrame
 Instance.new("UICorner", AutoSingleBtn).CornerRadius = UDim.new(0, 4)
 
+-- Multi-Macro Input Box
+local MultiMacroBox = Instance.new("TextBox")
+MultiMacroBox.Size = UDim2.new(0.6, 0, 0, 30)
+MultiMacroBox.Position = UDim2.new(0.05, 0, 0, 205)
+MultiMacroBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+MultiMacroBox.Text = "Macro1, Macro2"
+MultiMacroBox.PlaceholderText = "Macro1, Macro2..."
+MultiMacroBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+MultiMacroBox.Font = Enum.Font.SourceSans
+MultiMacroBox.TextSize = 12
+MultiMacroBox.Parent = ContentFrame
+Instance.new("UICorner", MultiMacroBox).CornerRadius = UDim.new(0, 4)
+
+-- Multi-Macro Toggle Button
+local MultiMacroBtn = Instance.new("TextButton")
+MultiMacroBtn.Size = UDim2.new(0.28, 0, 0, 30)
+MultiMacroBtn.Position = UDim2.new(0.67, 0, 0, 205)
+MultiMacroBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
+MultiMacroBtn.Text = "Multi: OFF"
+MultiMacroBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MultiMacroBtn.Font = Enum.Font.SourceSansBold
+MultiMacroBtn.TextSize = 11
+MultiMacroBtn.Parent = ContentFrame
+Instance.new("UICorner", MultiMacroBtn).CornerRadius = UDim.new(0, 4)
+
 -- Speed Multiplier Toggle Button
 local SpeedBtn = Instance.new("TextButton")
 SpeedBtn.Size = UDim2.new(0.9, 0, 0, 30)
-SpeedBtn.Position = UDim2.new(0.05, 0, 0, 205)
+SpeedBtn.Position = UDim2.new(0.05, 0, 0, 240)
 SpeedBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 SpeedBtn.Text = "Speed: 1x"
 SpeedBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -320,7 +361,7 @@ Instance.new("UICorner", SpeedBtn).CornerRadius = UDim.new(0, 4)
 -- Map Input Box
 local MapNameBox = Instance.new("TextBox")
 MapNameBox.Size = UDim2.new(0.6, 0, 0, 30)
-MapNameBox.Position = UDim2.new(0.05, 0, 0, 240)
+MapNameBox.Position = UDim2.new(0.05, 0, 0, 275)
 MapNameBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 MapNameBox.Text = "Desert"
 MapNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -332,7 +373,7 @@ Instance.new("UICorner", MapNameBox).CornerRadius = UDim.new(0, 4)
 -- Auto Vote Map Toggle Button
 local AutoVoteBtn = Instance.new("TextButton")
 AutoVoteBtn.Size = UDim2.new(0.28, 0, 0, 30)
-AutoVoteBtn.Position = UDim2.new(0.67, 0, 0, 240)
+AutoVoteBtn.Position = UDim2.new(0.67, 0, 0, 275)
 AutoVoteBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoVoteBtn.Text = "Vote ON"
 AutoVoteBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -344,7 +385,7 @@ Instance.new("UICorner", AutoVoteBtn).CornerRadius = UDim.new(0, 4)
 -- Difficulty Input Box
 local DiffNameBox = Instance.new("TextBox")
 DiffNameBox.Size = UDim2.new(0.6, 0, 0, 30)
-DiffNameBox.Position = UDim2.new(0.05, 0, 0, 275)
+DiffNameBox.Position = UDim2.new(0.05, 0, 0, 310)
 DiffNameBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 DiffNameBox.Text = "Nightmare"
 DiffNameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -356,7 +397,7 @@ Instance.new("UICorner", DiffNameBox).CornerRadius = UDim.new(0, 4)
 -- Auto Vote Difficulty Toggle Button
 local AutoVoteDiffBtn = Instance.new("TextButton")
 AutoVoteDiffBtn.Size = UDim2.new(0.28, 0, 0, 30)
-AutoVoteDiffBtn.Position = UDim2.new(0.67, 0, 0, 275)
+AutoVoteDiffBtn.Position = UDim2.new(0.67, 0, 0, 310)
 AutoVoteDiffBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoVoteDiffBtn.Text = "Diff ON"
 AutoVoteDiffBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -368,7 +409,7 @@ Instance.new("UICorner", AutoVoteDiffBtn).CornerRadius = UDim.new(0, 4)
 -- Auto Summon Toggle Button
 local AutoSummonBtn = Instance.new("TextButton")
 AutoSummonBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoSummonBtn.Position = UDim2.new(0.05, 0, 0, 310)
+AutoSummonBtn.Position = UDim2.new(0.05, 0, 0, 345)
 AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoSummonBtn.Text = "Auto Summon: OFF"
 AutoSummonBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -380,7 +421,7 @@ Instance.new("UICorner", AutoSummonBtn).CornerRadius = UDim.new(0, 4)
 -- Auto Ability Toggle Button
 local AutoAbilityBtn = Instance.new("TextButton")
 AutoAbilityBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoAbilityBtn.Position = UDim2.new(0.05, 0, 0, 345)
+AutoAbilityBtn.Position = UDim2.new(0.05, 0, 0, 380)
 AutoAbilityBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoAbilityBtn.Text = "Auto Ability: OFF"
 AutoAbilityBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -392,7 +433,7 @@ Instance.new("UICorner", AutoAbilityBtn).CornerRadius = UDim.new(0, 4)
 -- Auto Vote Skip Toggle Button
 local AutoSkipBtn = Instance.new("TextButton")
 AutoSkipBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoSkipBtn.Position = UDim2.new(0.05, 0, 0, 380)
+AutoSkipBtn.Position = UDim2.new(0.05, 0, 0, 415)
 AutoSkipBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoSkipBtn.Text = "Auto Skip Wave: OFF"
 AutoSkipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -404,7 +445,7 @@ Instance.new("UICorner", AutoSkipBtn).CornerRadius = UDim.new(0, 4)
 -- Crate Name Input Box
 local CrateNameBox = Instance.new("TextBox")
 CrateNameBox.Size = UDim2.new(0.6, 0, 0, 30)
-CrateNameBox.Position = UDim2.new(0.05, 0, 0, 415)
+CrateNameBox.Position = UDim2.new(0.05, 0, 0, 450)
 CrateNameBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 CrateNameBox.Text = "Space Crate"
 CrateNameBox.PlaceholderText = "Nama Crate"
@@ -417,7 +458,7 @@ Instance.new("UICorner", CrateNameBox).CornerRadius = UDim.new(0, 4)
 -- Auto Open Crate Toggle Button
 local AutoCrateBtn = Instance.new("TextButton")
 AutoCrateBtn.Size = UDim2.new(0.28, 0, 0, 30)
-AutoCrateBtn.Position = UDim2.new(0.67, 0, 0, 415)
+AutoCrateBtn.Position = UDim2.new(0.67, 0, 0, 450)
 AutoCrateBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoCrateBtn.Text = "Crate: OFF"
 AutoCrateBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -429,7 +470,7 @@ Instance.new("UICorner", AutoCrateBtn).CornerRadius = UDim.new(0, 4)
 -- Auto Premium Summon Toggle Button
 local AutoPremSummonBtn = Instance.new("TextButton")
 AutoPremSummonBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoPremSummonBtn.Position = UDim2.new(0.05, 0, 0, 450)
+AutoPremSummonBtn.Position = UDim2.new(0.05, 0, 0, 485)
 AutoPremSummonBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoPremSummonBtn.Text = "Auto Prem Summon: OFF"
 AutoPremSummonBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -441,7 +482,7 @@ Instance.new("UICorner", AutoPremSummonBtn).CornerRadius = UDim.new(0, 4)
 -- Auto Buy Crate Toggle Button
 local AutoBuyCrateBtn = Instance.new("TextButton")
 AutoBuyCrateBtn.Size = UDim2.new(0.9, 0, 0, 30)
-AutoBuyCrateBtn.Position = UDim2.new(0.05, 0, 0, 485)
+AutoBuyCrateBtn.Position = UDim2.new(0.05, 0, 0, 520)
 AutoBuyCrateBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoBuyCrateBtn.Text = "Auto Buy Crate: OFF"
 AutoBuyCrateBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -452,8 +493,8 @@ Instance.new("UICorner", AutoBuyCrateBtn).CornerRadius = UDim.new(0, 4)
 
 -- Detailed Status Info Label
 local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(0.9, 0, 0, 140)
-StatusLabel.Position = UDim2.new(0.05, 0, 0, 520)
+StatusLabel.Size = UDim2.new(0.9, 0, 0, 130)
+StatusLabel.Position = UDim2.new(0.05, 0, 0, 555)
 StatusLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 StatusLabel.Text = "Status: Ready\nSilahkan pilih Macro atau mulai Recording."
 StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
@@ -473,7 +514,7 @@ MinimizeBtn.MouseButton1Click:Connect(function()
         ContentFrame.Visible = false
         MinimizeBtn.Text = "+"
     else
-        MainFrame.Size = UDim2.new(0, 240, 0, 685)
+        MainFrame.Size = UDim2.new(0, 240, 0, 720)
         ContentFrame.Visible = true
         MinimizeBtn.Text = "-"
     end
@@ -490,6 +531,11 @@ end)
 updateAutoPlayUI = function()
     AutoSingleBtn.Text = isAutoPlaySingleEnabled and "Auto Play: ON" or "Auto Play: OFF"
     AutoSingleBtn.BackgroundColor3 = isAutoPlaySingleEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
+end
+
+local function updateMultiMacroUI()
+    MultiMacroBtn.Text = isMultiMacroEnabled and "Multi: ON" or "Multi: OFF"
+    MultiMacroBtn.BackgroundColor3 = isMultiMacroEnabled and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
 end
 
 saveConfigToFile = function()
@@ -509,7 +555,10 @@ saveConfigToFile = function()
         diffName = DiffNameBox.Text,
         crateName = CrateNameBox.Text,
         selectedMacro = selectedMacroFile,
-        saveInputText = SaveNameBox.Text
+        saveInputText = SaveNameBox.Text,
+        isMultiMacro = isMultiMacroEnabled,
+        multiMacroListText = MultiMacroBox.Text,
+        multiMacroIndex = currentMultiMacroIndex
     }
     writefile(CONFIG_FILE, HttpService:JSONEncode(configData))
 end
@@ -523,6 +572,13 @@ loadConfigFromFile = function()
     if success and typeof(result) == "table" then
         if result.autoPlaySingle ~= nil then isAutoPlaySingleEnabled = result.autoPlaySingle end
         updateAutoPlayUI()
+        
+        if result.isMultiMacro ~= nil then
+            isMultiMacroEnabled = result.isMultiMacro
+            updateMultiMacroUI()
+        end
+        if result.multiMacroListText then MultiMacroBox.Text = result.multiMacroListText end
+        if result.multiMacroIndex then currentMultiMacroIndex = result.multiMacroIndex end
         
         if result.autoVote ~= nil then
             isAutoVoteEnabled = result.autoVote
@@ -833,7 +889,7 @@ playMacroQueue = function(macroName)
     if macroName and macroName ~= "" then
         local loadSuccess = loadMacroFromFile(macroName)
         if not loadSuccess then
-            StatusLabel.Text = "Status: Gagal memuat macro!"
+            StatusLabel.Text = string.format("Status: Gagal memuat macro '%s'!", macroName)
             return
         end
     end
@@ -848,7 +904,7 @@ playMacroQueue = function(macroName)
     placedTowersPlay = {}
     local globalPlaceActions = {}
     
-    logConsole("--- Memulai Playback ---")
+    logConsole("--- Memulai Playback: " .. (selectedMacroFile ~= "" and selectedMacroFile or "Current") .. " ---")
     
     task.spawn(function()
         local playStartTime = tick()
@@ -1046,7 +1102,15 @@ PlayBtn.MouseButton1Click:Connect(function()
     end
     
     if not isRecording then
-        if selectedMacroFile ~= "" then
+        if isMultiMacroEnabled then
+            multiMacroQueue = parseMultiMacroList(MultiMacroBox.Text)
+            if #multiMacroQueue > 0 then
+                local targetMacro = multiMacroQueue[currentMultiMacroIndex] or multiMacroQueue[1]
+                playMacroQueue(targetMacro)
+            else
+                StatusLabel.Text = "Status: Daftar Multi-Macro Kosong!"
+            end
+        elseif selectedMacroFile ~= "" then
             playMacroQueue(selectedMacroFile)
         elseif #recordedActions > 0 then
             playMacroQueue("")
@@ -1063,6 +1127,7 @@ SaveBtn.MouseButton1Click:Connect(function()
 end)
 
 CrateNameBox.FocusLost:Connect(function() saveConfigToFile() end)
+MultiMacroBox.FocusLost:Connect(function() saveConfigToFile() end)
 
 RefreshBtn.MouseButton1Click:Connect(function()
     if not supportsFileSystem then return end
@@ -1111,6 +1176,12 @@ end)
 AutoSingleBtn.MouseButton1Click:Connect(function()
     isAutoPlaySingleEnabled = not isAutoPlaySingleEnabled
     updateAutoPlayUI()
+    saveConfigToFile()
+end)
+
+MultiMacroBtn.MouseButton1Click:Connect(function()
+    isMultiMacroEnabled = not isMultiMacroEnabled
+    updateMultiMacroUI()
     saveConfigToFile()
 end)
 
@@ -1421,7 +1492,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO PLAY & VOTE LOOP
+-- AUTO PLAY & VOTE LOOP (WITH MULTI-MACRO)
 -- ==========================================
 
 local function isMatchActuallyStarted()
@@ -1464,11 +1535,26 @@ task.spawn(function()
         
         if isMatchActuallyStarted() then
             setGameSpeed(currentSpeedMultiplier)
-            if isAutoPlaySingleEnabled and not isPlaying and not isRecording and not hasAutoPlayedThisSession then
+            if (isAutoPlaySingleEnabled or isMultiMacroEnabled) and not isPlaying and not isRecording and not hasAutoPlayedThisSession then
                 hasAutoPlayedThisSession = true
+                playedPreviousMatch = true
                 
-                if selectedMacroFile ~= "" then
-                    playMacroQueue(selectedMacroFile)
+                local macroToPlay = ""
+                if isMultiMacroEnabled then
+                    multiMacroQueue = parseMultiMacroList(MultiMacroBox.Text)
+                    if #multiMacroQueue > 0 then
+                        if currentMultiMacroIndex > #multiMacroQueue then
+                            currentMultiMacroIndex = 1
+                        end
+                        macroToPlay = multiMacroQueue[currentMultiMacroIndex]
+                        logConsole(string.format("[MULTI MACRO] Menjalankan Makro (%d/%d): %s", currentMultiMacroIndex, #multiMacroQueue, macroToPlay))
+                    end
+                else
+                    macroToPlay = selectedMacroFile
+                end
+                
+                if macroToPlay and macroToPlay ~= "" then
+                    playMacroQueue(macroToPlay)
                 elseif #recordedActions > 0 then
                     playMacroQueue("")
                 else
@@ -1476,6 +1562,21 @@ task.spawn(function()
                 end
             end
         else
+            -- Ketika match selesai / keluar / berpindah map
+            if hasAutoPlayedThisSession or playedPreviousMatch then
+                if isMultiMacroEnabled and playedPreviousMatch then
+                    multiMacroQueue = parseMultiMacroList(MultiMacroBox.Text)
+                    if #multiMacroQueue > 0 then
+                        currentMultiMacroIndex = currentMultiMacroIndex + 1
+                        if currentMultiMacroIndex > #multiMacroQueue then
+                            currentMultiMacroIndex = 1 -- Loop kembali ke makro pertama
+                        end
+                        saveConfigToFile()
+                        logConsole(string.format("[MULTI MACRO] Perpindahan Map Terdeteksi! Makro berikutnya: %d (%s)", currentMultiMacroIndex, tostring(multiMacroQueue[currentMultiMacroIndex])))
+                    end
+                end
+                playedPreviousMatch = false
+            end
             hasAutoPlayedThisSession = false
             hasVotedThisSession = false
         end
