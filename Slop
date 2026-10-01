@@ -407,7 +407,7 @@ Instance.new("UICorner", DiffNameBox).CornerRadius = UDim.new(0, 4)
 
 -- Auto Vote Difficulty Toggle Button
 local AutoVoteDiffBtn = Instance.new("TextButton")
-AutoVoteDiffBtn.Size = UDim2.new(0.28, 0, 0, 310)
+AutoVoteDiffBtn.Size = UDim2.new(0.28, 0, 0, 30)
 AutoVoteDiffBtn.Position = UDim2.new(0.67, 0, 0, 310)
 AutoVoteDiffBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 AutoVoteDiffBtn.Text = "Diff ON"
@@ -1064,8 +1064,15 @@ playMacroQueue = function(macroName)
         end
         
         logConsole("--- Playback Selesai ---")
-        StatusLabel.Text = "Status: Playback Finished!"
+        StatusLabel.Text = string.format("Status: Playback Selesai! (%s)", selectedMacroFile)
         isPlaying = false
+
+        -- [FIX CRUCIAL] Apabila Multi-Macro aktif, ijinkan auto-reset session
+        -- agar map/raid berikutnya siap menjalankan makro urutan berikutnya.
+        if isMultiMacroEnabled then
+            task.wait(2)
+            hasAutoPlayedThisSession = false
+        end
     end)
 end
 
@@ -1510,14 +1517,11 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO PLAY & VOTE LOOP (UNIVERSAL DETECTOR)
+-- AUTO PLAY & VOTE LOOP (UNIVERSAL DETECTOR - FIXED)
 -- ==========================================
 
 local function isMatchActuallyStarted()
-    local functionsFolder = LocalReplicatedStorage:FindFirstChild("Functions")
-    local spawnRemote = functionsFolder and functionsFolder:FindFirstChild("SpawnTower")
-    
-    -- Universal map detection (Lebih fleksibel mendeteksi map Raid 2)
+    -- Cek ketersediaan map/stage fisik di Workspace
     local hasMapContainer = Workspace:FindFirstChild("Towers") 
                          or Workspace:FindFirstChild("Map") 
                          or Workspace:FindFirstChild("Board") 
@@ -1525,7 +1529,7 @@ local function isMatchActuallyStarted()
                          or Workspace:FindFirstChild("RaidMap")
                          or Workspace:FindFirstChild("Ingame")
     
-    return (spawnRemote ~= nil or hasMapContainer ~= nil)
+    return (hasMapContainer ~= nil)
 end
 
 task.spawn(function()
@@ -1575,12 +1579,12 @@ task.spawn(function()
                         macroToPlay = multiMacroQueue[currentMultiMacroIndex]
                         logConsole(string.format("[MULTI MACRO] Menjalankan Makro (#%d dari %d): %s", currentMultiMacroIndex, #multiMacroQueue, macroToPlay))
                         
-                        -- PENTING: Langsung simpan urutan BERIKUTNYA ke file saat playback dimulai.
-                        -- Ini menjamin saat game teleport ke Raid 2, config.json sudah menyimpan index #2!
-                        currentMultiMacroIndex = currentMultiMacroIndex + 1
-                        if currentMultiMacroIndex > #multiMacroQueue then
-                            currentMultiMacroIndex = 1
+                        -- Persiapkan urutan berikutnya ke config.json
+                        local nextIndex = currentMultiMacroIndex + 1
+                        if nextIndex > #multiMacroQueue then
+                            nextIndex = 1
                         end
+                        currentMultiMacroIndex = nextIndex
                         saveConfigToFile()
                         logConsole(string.format("[MULTI MACRO] Index disiapkan untuk map berikutnya: #%d", currentMultiMacroIndex))
                     end
