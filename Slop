@@ -33,17 +33,17 @@ local currentSpeedMultiplier = 1
 local isMultiMacroEnabled = false
 local multiMacroQueue = {}
 local currentMultiMacroIndex = 1
-local playedPreviousMatch = false
 
-local autoSummonAmount = 0 -- 0 = OFF, 10 = 10x, 50 = 50x
-local autoPremSummonAmount = 0 -- 0 = OFF, 1 = 1x, 10 = 10x, 50 = 50x
-local autoCrateAmount = 0 -- 0 = OFF, 1 = 1x, 10 = 10x, 25 = 25x
-local autoBuyCrateAmount = 0 -- 0 = OFF, 1 = 1x, 3 = 3x, 10 = 10x
+local autoSummonAmount = 0
+local autoPremSummonAmount = 0
+local autoCrateAmount = 0
+local autoBuyCrateAmount = 0
 local isAutoAbilityEnabled = false
 local isAutoVoteSkipEnabled = false
 
 -- Loop & Timing Variables
 local hasAutoPlayedThisSession = false
+local lastDetectedMapName = ""
 
 -- Auto Vote Variables
 local isAutoVoteEnabled = false
@@ -323,7 +323,7 @@ Instance.new("UICorner", AutoSingleBtn).CornerRadius = UDim.new(0, 4)
 
 -- Multi-Macro Input Box
 local MultiMacroBox = Instance.new("TextBox")
-MultiMacroBox.Size = UDim2.new(0.6, 0, 0, 30)
+MultiMacroBox.Size = UDim2.new(0.42, 0, 0, 30)
 MultiMacroBox.Position = UDim2.new(0.05, 0, 0, 205)
 MultiMacroBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 MultiMacroBox.Text = "Macro1, Macro2"
@@ -336,8 +336,8 @@ Instance.new("UICorner", MultiMacroBox).CornerRadius = UDim.new(0, 4)
 
 -- Multi-Macro Toggle Button
 local MultiMacroBtn = Instance.new("TextButton")
-MultiMacroBtn.Size = UDim2.new(0.28, 0, 0, 30)
-MultiMacroBtn.Position = UDim2.new(0.67, 0, 0, 205)
+MultiMacroBtn.Size = UDim2.new(0.25, 0, 0, 30)
+MultiMacroBtn.Position = UDim2.new(0.49, 0, 0, 205)
 MultiMacroBtn.BackgroundColor3 = Color3.fromRGB(100, 40, 40)
 MultiMacroBtn.Text = "Multi: OFF"
 MultiMacroBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -345,6 +345,18 @@ MultiMacroBtn.Font = Enum.Font.SourceSansBold
 MultiMacroBtn.TextSize = 11
 MultiMacroBtn.Parent = ContentFrame
 Instance.new("UICorner", MultiMacroBtn).CornerRadius = UDim.new(0, 4)
+
+-- Reset Multi Index Button
+local ResetMultiBtn = Instance.new("TextButton")
+ResetMultiBtn.Size = UDim2.new(0.19, 0, 0, 30)
+ResetMultiBtn.Position = UDim2.new(0.76, 0, 0, 205)
+ResetMultiBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 150)
+ResetMultiBtn.Text = "Reset #1"
+ResetMultiBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ResetMultiBtn.Font = Enum.Font.SourceSansBold
+ResetMultiBtn.TextSize = 10
+ResetMultiBtn.Parent = ContentFrame
+Instance.new("UICorner", ResetMultiBtn).CornerRadius = UDim.new(0, 4)
 
 -- Speed Multiplier Toggle Button
 local SpeedBtn = Instance.new("TextButton")
@@ -598,11 +610,7 @@ loadConfigFromFile = function()
             SpeedBtn.BackgroundColor3 = (currentSpeedMultiplier > 1) and Color3.fromRGB(40, 160, 40) or Color3.fromRGB(100, 40, 40)
         end
         
-        if result.autoSummonAmount ~= nil then
-            autoSummonAmount = result.autoSummonAmount
-        elseif result.autoSummon ~= nil then
-            autoSummonAmount = result.autoSummon and 10 or 0
-        end
+        if result.autoSummonAmount ~= nil then autoSummonAmount = result.autoSummonAmount end
         if autoSummonAmount > 0 then
             AutoSummonBtn.Text = string.format("Auto Summon (%dx): ON", autoSummonAmount)
             AutoSummonBtn.BackgroundColor3 = Color3.fromRGB(40, 160, 40)
@@ -1057,6 +1065,19 @@ playMacroQueue = function(macroName)
         logConsole("--- Playback Selesai ---")
         StatusLabel.Text = "Status: Playback Finished!"
         isPlaying = false
+
+        -- PERBAIKAN MULTI-MACRO: Langsung naikkan urutan & simpan config setelah makro selesai
+        if isMultiMacroEnabled then
+            multiMacroQueue = parseMultiMacroList(MultiMacroBox.Text)
+            if #multiMacroQueue > 0 then
+                currentMultiMacroIndex = currentMultiMacroIndex + 1
+                if currentMultiMacroIndex > #multiMacroQueue then
+                    currentMultiMacroIndex = 1 -- Loop ke makro pertama
+                end
+                saveConfigToFile()
+                logConsole(string.format("[MULTI MACRO SUCCESS] Makro selesai. Urutan berikutnya disiapkan: #%d (%s)", currentMultiMacroIndex, tostring(multiMacroQueue[currentMultiMacroIndex])))
+            end
+        end
     end)
 end
 
@@ -1183,6 +1204,15 @@ MultiMacroBtn.MouseButton1Click:Connect(function()
     isMultiMacroEnabled = not isMultiMacroEnabled
     updateMultiMacroUI()
     saveConfigToFile()
+end)
+
+ResetMultiBtn.MouseButton1Click:Connect(function()
+    currentMultiMacroIndex = 1
+    saveConfigToFile()
+    multiMacroQueue = parseMultiMacroList(MultiMacroBox.Text)
+    local firstName = multiMacroQueue[1] or "None"
+    StatusLabel.Text = string.format("Status: Multi-Macro Direset!\nUrutan Kembali ke #1 (%s)", firstName)
+    logConsole("[MULTI MACRO]: Index direset ke 1 oleh pengguna.")
 end)
 
 SpeedBtn.MouseButton1Click:Connect(function()
@@ -1492,7 +1522,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- AUTO PLAY & VOTE LOOP (WITH MULTI-MACRO)
+-- AUTO PLAY & VOTE LOOP (PERSISTENT MULTI-MACRO)
 -- ==========================================
 
 local function isMatchActuallyStarted()
@@ -1535,9 +1565,9 @@ task.spawn(function()
         
         if isMatchActuallyStarted() then
             setGameSpeed(currentSpeedMultiplier)
+            
             if (isAutoPlaySingleEnabled or isMultiMacroEnabled) and not isPlaying and not isRecording and not hasAutoPlayedThisSession then
                 hasAutoPlayedThisSession = true
-                playedPreviousMatch = true
                 
                 local macroToPlay = ""
                 if isMultiMacroEnabled then
@@ -1547,7 +1577,7 @@ task.spawn(function()
                             currentMultiMacroIndex = 1
                         end
                         macroToPlay = multiMacroQueue[currentMultiMacroIndex]
-                        logConsole(string.format("[MULTI MACRO] Menjalankan Makro (%d/%d): %s", currentMultiMacroIndex, #multiMacroQueue, macroToPlay))
+                        logConsole(string.format("[MULTI MACRO] Menjalankan Makro (#%d dari %d): %s", currentMultiMacroIndex, #multiMacroQueue, macroToPlay))
                     end
                 else
                     macroToPlay = selectedMacroFile
@@ -1562,21 +1592,6 @@ task.spawn(function()
                 end
             end
         else
-            -- Ketika match selesai / keluar / berpindah map
-            if hasAutoPlayedThisSession or playedPreviousMatch then
-                if isMultiMacroEnabled and playedPreviousMatch then
-                    multiMacroQueue = parseMultiMacroList(MultiMacroBox.Text)
-                    if #multiMacroQueue > 0 then
-                        currentMultiMacroIndex = currentMultiMacroIndex + 1
-                        if currentMultiMacroIndex > #multiMacroQueue then
-                            currentMultiMacroIndex = 1 -- Loop kembali ke makro pertama
-                        end
-                        saveConfigToFile()
-                        logConsole(string.format("[MULTI MACRO] Perpindahan Map Terdeteksi! Makro berikutnya: %d (%s)", currentMultiMacroIndex, tostring(multiMacroQueue[currentMultiMacroIndex])))
-                    end
-                end
-                playedPreviousMatch = false
-            end
             hasAutoPlayedThisSession = false
             hasVotedThisSession = false
         end
